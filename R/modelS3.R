@@ -20,6 +20,9 @@
 #' @method coef CBDCS
 #' @method coef CBDQCS
 #' @method coef STARS
+#' @method coef CFMS
+#' @method coef CFM2S
+#' @method coef CAES
 #'
 #' @method forecast LCS
 #' @method forecast RHS
@@ -29,6 +32,9 @@
 #' @method forecast CBDQCS
 #' @method forecast STARS
 #' @method forecast ENS
+#' @method forecast CFMS
+#' @method forecast CFM2S
+#' @method forecast CAES
 #'
 #' @method plot LCS
 #' @method plot RHS
@@ -38,6 +44,9 @@
 #' @method plot CBDQCS
 #' @method plot STARS
 #' @method plot ENS
+#' @method plot CFMS
+#' @method plot CFM2S
+#' @method plot CAES
 #'
 #' @method residuals LCS
 #' @method residuals RHS
@@ -46,5 +55,8 @@
 #' @method residuals CBDCS
 #' @method residuals CBDQCS
 #' @method residuals STARS
+#' @method residuals CFMS
+#' @method residuals CFM2S
+#' @method residuals CAES
 #'
 NULL
