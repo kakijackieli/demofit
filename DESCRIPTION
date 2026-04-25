@@ -1,6 +1,6 @@
 Package: demofit
 Title: Parametric Mortality Curve Fitting and Mortality Forecasting Tools
-Version: 0.1.2
+Version: 0.1.3
 Authors@R: person("Jackie", "Li", , "jackieli@smu.edu.sg", role = c("aut", "cre", "cph"))
 Author: Jackie Li [aut, cre, cph]
 Maintainer: Jackie Li <jackieli@smu.edu.sg>
