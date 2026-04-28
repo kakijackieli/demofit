@@ -15,6 +15,9 @@
 #' @return 
 #' An object of class ENS with associated S3 methods forecast and plot.
 #'
+#' @references
+#' Li, J. (2023). A model stacking approach for forecasting mortality. North American Actuarial Journal, 27(3), 530-545.
+#'
 #' @examples
 #' x <- 60:69
 #' a <- c(-4.8499,-4.7676,-4.6719,-4.5722,-4.4847,-4.3841,-4.2813,-4.1863,-4.0861,-3.9962)
@@ -32,7 +35,7 @@
 ENS <- function(x,M,wm=rep(1/7,7),curve=c("gompertz","makeham","oppermann","thiele","wittsteinbumsted","perks","weibull","vandermaen","beard","heligmanpollard","rogersplanck","siler","martinelle","thatcher","gompertz2","makeham2","oppermann2","thiele2","wittsteinbumsted2","perks2","weibull2","vandermaen2","beard2","heligmanpollard2","rogersplanck2","siler2","martinelle2","thatcher2"),h=10,jumpoff=1) {
 if (length(wm)!=7) { stop("wm must have a length of 7") }
 if (any(wm<0)) { stop("wm must be non-negative") }
-if(abs(sum(wm)-1)>1e-8) { stop("wm must sum to 1") }
+if (abs(sum(wm)-1)>1e-8) { stop("wm must sum to 1") }
 curve <- tryCatch(match.arg(curve),error = function(e) { stop("invalid curve choice") })
 tryCatch({
 fit1 <- LCS(x,M,curve,h,jumpoff)

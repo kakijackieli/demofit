@@ -18,12 +18,13 @@
 #'
 #' @importFrom forecast auto.arima tsclean forecast
 #' @importFrom NlcOptim solnl
-#' @importFrom stats nlminb lm sd
+#' @importFrom stats nlminb lm sd simulate cov
+#' @importFrom MASS mvrnorm
 #' @importFrom graphics par lines legend points image 
 #' @importFrom grDevices colorRampPalette
 #'
 #' @return
-#' An object of class STARS with associated S3 methods coef, forecast, plot, and residuals.
+#' An object of class STARS with associated S3 methods coef, forecast, plot, residuals, and simulate (nsim for setting number of simulations; seed for initialising random number generator).
 #'
 #' @references
 #' Li, H. and Lu, Y. (2017). Coherent forecasting of mortality rates: A sparse vector-autoregression approach. ASTIN Bulletin, 47(2), 563-600.
@@ -61,22 +62,23 @@ if (!is.numeric(h)) { stop("h must be numeric") }
 if (h<1) { stop("h must be at least 1") }
 curve <- tryCatch(match.arg(curve),error = function(e) { stop("invalid curve choice") })
 tryCatch({
-u <- numeric(); a <- numeric(); b <- numeric(); R <- array(0,c(ncol(M),ncol(M)))
-u[1] = (log(M[nrow(M),1])-log(M[1,1]))/(nrow(M)-1)
-yy <- diff(log(M[,2])); xx <- log(M[-nrow(M),1])-log(M[-nrow(M),2])
+nr <- nrow(M); nc <- ncol(M)
+u <- numeric(); a <- numeric(); b <- numeric(); R <- array(0,c(nc,nc))
+u[1] = (log(M[nr,1])-log(M[1,1]))/(nr-1)
+yy <- diff(log(M[,2])); xx <- log(M[-nr,1])-log(M[-nr,2])
 fit <- lm(yy~xx)
 u[2] <- as.numeric(fit$coef[1]); a[2] <- as.numeric(fit$coef[2])
 if (a[2]<0||a[2]>1) {
-error <- function(p) { sum((log(M[-1,2])-p[1]-p[2]*log(M[-nrow(M),1])-(1-p[2])*log(M[-nrow(M),2]))^2) }
+error <- function(p) { sum((log(M[-1,2])-p[1]-p[2]*log(M[-nr,1])-(1-p[2])*log(M[-nr,2]))^2) }
 iv <- c(u[2],0); ilower <- c(-Inf,0); iupper<- c(Inf,1)
 fit <- nlminb(iv,error,lower=ilower,upper=iupper)
 u[2] <- as.numeric(fit$par[1]); a[2] <- as.numeric(fit$par[2]) }
-for (j in 3:ncol(M)) {
-yy <- diff(log(M[,j])); xx1 <- log(M[-nrow(M),j-1])-log(M[-nrow(M),j]); xx2 <- log(M[-nrow(M),j-2])-log(M[-nrow(M),j])
+for (j in 3:nc) {
+yy <- diff(log(M[,j])); xx1 <- log(M[-nr,j-1])-log(M[-nr,j]); xx2 <- log(M[-nr,j-2])-log(M[-nr,j])
 fit <- lm(yy~xx1+xx2)
 u[j] <- as.numeric(fit$coef[1]); a[j] <- as.numeric(fit$coef[2]); b[j] <- as.numeric(fit$coef[3])
 if (a[j]<0||b[j]<0||a[j]+b[j]>1) {
-error <- function(p) { sum((log(M[-1,j])-p[1]-p[3]*log(M[-nrow(M),j-2])-p[2]*log(M[-nrow(M),j-1])-(1-p[2]-p[3])*log(M[-nrow(M),j]))^2) }
+error <- function(p) { sum((log(M[-1,j])-p[1]-p[3]*log(M[-nr,j-2])-p[2]*log(M[-nr,j-1])-(1-p[2]-p[3])*log(M[-nr,j]))^2) }
 iv <- c(u[j],0,0); ilower <- c(-Inf,0,0); iupper<- c(Inf,1,1)
 fit <- nlminb(iv,error,lower=ilower,upper=iupper)
 u[j] <- as.numeric(fit$par[1]); a[j] <- as.numeric(fit$par[2]); b[j] <- as.numeric(fit$par[3]) }
@@ -87,13 +89,13 @@ u[j] <- as.numeric(fit$par[1]); a[j] <- as.numeric(fit$par[2]); b[j] <- as.numer
 }
 R[1,1] <- 1
 R[2,1]<- a[2]; R[2,2] <- 1-a[2]
-for (j in 3:ncol(M)) { R[j,j-2] <- b[j]; R[j,j-1] <- a[j]; R[j,j] <-1-a[j]-b[j] }
-res <- array(NA,c(nrow(M)-1,ncol(M)))
-for (i in 1:(nrow(M)-1)) { res[i,] <- log(M[i+1,])-u-R%*%log(M[i,]) }
+for (j in 3:nc) { R[j,j-2] <- b[j]; R[j,j-1] <- a[j]; R[j,j] <-1-a[j]-b[j] }
+res <- array(NA,c(nr-1,nc))
+for (i in 1:(nr-1)) { res[i,] <- log(M[i+1,])-u-R%*%log(M[i,]) }
 res <- (res-mean(res))/sd(res)
-Mf <- array(NA,c(h,ncol(M))); Mfs <- array(NA,c(h,ncol(M)))
-Mf[1,] <-  exp(u+R%*%log(M[nrow(M),]))
-for (i in 2:h) { Mf[i,] <-  exp(u+R%*%log(Mf[i-1,])) }
+Mf <- array(NA,c(h,nc)); Mfs <- array(NA,c(h,nc))
+Mf[1,] <- exp(u+R%*%log(M[nr,]))
+for (i in 2:h) { Mf[i,] <- exp(u+R%*%log(Mf[i-1,])) }
 for (i in 1:h) { Mfs[i,] <- fitted(MC(x=x,m=Mf[i,],curve=curve)) }
 invisible(structure(
 list(curve=curve,x=x,M=M,h=h,mu=u,R=R,standardresiduals=res,forecast=Mf,smoothforecast=Mfs),
@@ -129,4 +131,24 @@ legend("bottomright",legend=c("observed first data","observed last data",temp),p
 #' @export
 residuals.STARS <- function(object,...) {
 object$standardresiduals
+}
+
+#' @export
+simulate.STARS <- function(object,nsim=10,seed=123,...) {
+if (!is.numeric(nsim)||nsim!=floor(nsim)||nsim<1||!is.numeric(seed)||seed!=floor(seed)||seed<1) { stop("nsim and seed must be positive integers") }
+M <- object$M; h <- object$h
+u <- object$mu; R <- object$R
+nr <- nrow(M); nc <- ncol(M)
+res <- array(NA,c(nr-1,nc))
+for (i in 1:(nr-1)) { res[i,] <- log(M[i+1,])-u-R%*%log(M[i,]) }
+v <- cov(res)
+if (any(eigen(v,symmetric=TRUE,only.values=TRUE)$values<=0)) { s <- apply(res,2,sd); v <- diag(s^2) }
+Msim <- array(NA,c(h,nc,nsim))
+set.seed(seed)
+for (z in 1:nsim) {
+e <- as.numeric(mvrnorm(1,rep(0,nc),v))
+Msim[1,,z] <- exp(u+R%*%log(M[nr,])+e)
+for (i in 2:h) { e <- as.numeric(mvrnorm(1,rep(0,nc),v)); Msim[i,,z] <- exp(u+R%*%log(Msim[i-1,,z])+e) }
+}
+list(Msim=Msim,dispersion=v)
 }

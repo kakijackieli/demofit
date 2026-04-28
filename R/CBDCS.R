@@ -16,12 +16,12 @@
 #' The model is estimated by Newton updating scheme and is forecasted by ARIMA applied to \eqn{\kappa_{1,t}}, \eqn{\kappa_{2,t}}, and \eqn{\gamma_c}. Constraints include sum of \eqn{\gamma_c} is zero and sum of \eqn{c\gamma_c} is zero. It is designed for ages 50-90.
 #'
 #' @importFrom forecast auto.arima tsclean forecast
-#' @importFrom stats fitted lm sd
+#' @importFrom stats fitted lm sd simulate rnorm
 #' @importFrom graphics par lines legend points image 
 #' @importFrom grDevices colorRampPalette
 #'
 #' @return
-#' An object of class CBDCS with associated S3 methods coef, forecast, plot, and residuals.
+#' An object of class CBDCS with associated S3 methods coef, forecast, plot, residuals, and simulate (nsim for setting number of simulations; seed for initialising random number generator).
 #'
 #' @references
 #' Cairns, A.J.G., Blake, D., Dowd, K., Coughlan, G.D., Epstein, D., Ong, A., and Balevich, I. (2009). A quantitative comparison of stochastic mortality models using data from England and Wales and the United States. North American Actuarial Journal, 13(1), 1-35.
@@ -53,32 +53,33 @@ if (h<1) { stop("h must be at least 1") }
 if (jumpoff!=1&&jumpoff!=2) { stop("jump-off must be either 1 or 2") }
 curve <- tryCatch(match.arg(curve),error = function(e) { stop("invalid curve choice") })
 tryCatch({
+nr <- nrow(M); nc <- ncol(M)
 k1 <- numeric(); k2 <- numeric()
-xx <- x-mean(x); for (i in 1:nrow(M)) { yy <- log(M[i,]); k1[i] <- as.numeric(lm(yy~xx)$coef[1]); k2[i] <- as.numeric(lm(yy~xx)$coef[2]) }
-g <- rep(0,nrow(M)+ncol(M)-1)
+xx <- x-mean(x); for (i in 1:nr) { yy <- log(M[i,]); k1[i] <- as.numeric(lm(yy~xx)$coef[1]); k2[i] <- as.numeric(lm(yy~xx)$coef[2]) }
+g <- rep(0,nr+nc-1)
 olde <- 1000000; tol <- 1e-8
 for (z in 1:200) {
-k1mat <- matrix(k1,nrow(M),ncol(M),byrow=FALSE); k2mat <- matrix(k2,nrow(M),ncol(M),byrow=FALSE); gmat <- g[row(M)-col(M)+ncol(M)]; xm <- matrix(x-mean(x),nrow(M),ncol(M),byrow=TRUE)
-k1 <- k1+rowSums(log(M)-k1mat-k2mat*xm-gmat)/ncol(M)
-k1mat <- matrix(k1,nrow(M),ncol(M),byrow=FALSE); k2mat <- matrix(k2,nrow(M),ncol(M),byrow=FALSE); gmat <- g[row(M)-col(M)+ncol(M)]; xm <- matrix(x-mean(x),nrow(M),ncol(M),byrow=TRUE)
+k1mat <- matrix(k1,nr,nc,byrow=FALSE); k2mat <- matrix(k2,nr,nc,byrow=FALSE); gmat <- g[row(M)-col(M)+nc]; xm <- matrix(x-mean(x),nr,nc,byrow=TRUE)
+k1 <- k1+rowSums(log(M)-k1mat-k2mat*xm-gmat)/nc
+k1mat <- matrix(k1,nr,nc,byrow=FALSE); k2mat <- matrix(k2,nr,nc,byrow=FALSE); gmat <- g[row(M)-col(M)+nc]; xm <- matrix(x-mean(x),nr,nc,byrow=TRUE)
 k2 <- k2+rowSums((log(M)-k1mat-k2mat*xm-gmat)*xm)/sum((x-mean(x))^2)
-k1mat <- matrix(k1,nrow(M),ncol(M),byrow=FALSE); k2mat <- matrix(k2,nrow(M),ncol(M),byrow=FALSE); gmat <- g[row(M)-col(M)+ncol(M)]; xm <- matrix(x-mean(x),nrow(M),ncol(M),byrow=TRUE)
-g <- g+as.numeric(tapply(as.vector(log(M)-k1mat-k2mat*xm-gmat),as.vector(row(M)-col(M)+ncol(M)),mean)); g <- g-mean(g)
-cc <- c(1:(nrow(M)+ncol(M)-1)); C <- cbind(1,cc); g <- as.numeric(g-C%*%qr.solve(t(C)%*%C)%*%t(C)%*%g)
-k1mat <- matrix(k1,nrow(M),ncol(M),byrow=FALSE); k2mat <- matrix(k2,nrow(M),ncol(M),byrow=FALSE); gmat <- g[row(M)-col(M)+ncol(M)]; xm <- matrix(x-mean(x),nrow(M),ncol(M),byrow=TRUE)
+k1mat <- matrix(k1,nr,nc,byrow=FALSE); k2mat <- matrix(k2,nr,nc,byrow=FALSE); gmat <- g[row(M)-col(M)+nc]; xm <- matrix(x-mean(x),nr,nc,byrow=TRUE)
+g <- g+as.numeric(tapply(as.vector(log(M)-k1mat-k2mat*xm-gmat),as.vector(row(M)-col(M)+nc),mean)); g <- g-mean(g)
+cc <- c(1:(nr+nc-1)); C <- cbind(1,cc); g <- as.numeric(g-C%*%qr.solve(t(C)%*%C)%*%t(C)%*%g)
+k1mat <- matrix(k1,nr,nc,byrow=FALSE); k2mat <- matrix(k2,nr,nc,byrow=FALSE); gmat <- g[row(M)-col(M)+nc]; xm <- matrix(x-mean(x),nr,nc,byrow=TRUE)
 newe <- sum((log(M)-k1mat-k2mat*xm-gmat)^2)
 if (z>10&&olde-newe<tol&&olde>newe) { break }
 olde <- newe
 }
-res <- array(NA,c(nrow(M),ncol(M)))
-for (i in 1:nrow(M)) { for (j in 1:ncol(M)) { res[i,j] <- log(M[i,j])-k1[i]-k2[i]*(x[j]-mean(x))-g[i-j+ncol(M)] }}
+res <- array(NA,c(nr,nc))
+for (i in 1:nr) { for (j in 1:nc) { res[i,j] <- log(M[i,j])-k1[i]-k2[i]*(x[j]-mean(x))-g[i-j+nc] }}
 res <- (res-mean(res))/sd(res)
 k1f <- suppressMessages(forecast(auto.arima(tsclean(k1)),h=h)$mean)
 k2f <- suppressMessages(forecast(auto.arima(tsclean(k2)),h=h)$mean)
 gf <- suppressMessages(forecast(auto.arima(tsclean(g),stationary=TRUE),h=h)$mean); gg <- c(g,gf)
-Mf <- array(NA,c(h,ncol(M))); Mfs <- array(NA,c(h,ncol(M)))
-if (jumpoff==1) { for (i in 1:h) { for (j in 1:ncol(M)) { Mf[i,j] <- exp(k1f[i]+k2f[i]*(x[j]-mean(x))+gg[i-j+ncol(M)+nrow(M)]) }}}
-if (jumpoff==2) { for (i in 1:h) { for (j in 1:ncol(M)) { Mf[i,j] <- M[nrow(M),j]*exp(k1f[i]-k1[nrow(M)]+(k2f[i]-k2[nrow(M)])*(x[j]-mean(x))+gg[i-j+ncol(M)+nrow(M)]-g[nrow(M)-j+ncol(M)]) }}}
+Mf <- array(NA,c(h,nc)); Mfs <- array(NA,c(h,nc))
+if (jumpoff==1) { for (i in 1:h) { for (j in 1:nc) { Mf[i,j] <- exp(k1f[i]+k2f[i]*(x[j]-mean(x))+gg[i-j+nc+nr]) }}}
+if (jumpoff==2) { for (i in 1:h) { for (j in 1:nc) { Mf[i,j] <- M[nr,j]*exp(k1f[i]-k1[nr]+(k2f[i]-k2[nr])*(x[j]-mean(x))+gg[i-j+nc+nr]-g[nr-j+nc]) }}}
 for (i in 1:h) { Mfs[i,] <- fitted(MC(x=x,m=Mf[i,],curve=curve)) }
 invisible(structure(
 list(curve=curve,x=x,M=M,h=h,jumpoff=jumpoff,kappa1=k1,kappa2=k2,gamma=g,standardresiduals=res,forecast=Mf,smoothforecast=Mfs),
@@ -117,4 +118,40 @@ legend("bottomright",legend=c("observed first data","observed last data",temp),p
 #' @export
 residuals.CBDCS <- function(object,...) {
 object$standardresiduals
+}
+
+#' @export
+simulate.CBDCS <- function(object,nsim=10,seed=123,...) {
+if (!is.numeric(nsim)||nsim!=floor(nsim)||nsim<1||!is.numeric(seed)||seed!=floor(seed)||seed<1) { stop("nsim and seed must be positive integers") }
+x <- object$x; M <- object$M; h <- object$h; jumpoff <- object$jumpoff
+k1 <- object$kappa1; k2 <- object$kappa2; g <- object$gamma
+nr <- nrow(M); nc <- ncol(M)
+k1mat <- matrix(k1,nr,nc,byrow=FALSE)
+k2mat <- matrix(k2,nr,nc,byrow=FALSE)
+gmat <- g[row(M)-col(M)+nc]
+xmat <- matrix(x-mean(x),nr,nc,byrow=TRUE)
+res <- log(M)-k1mat-k2mat*xmat-gmat
+s <- sd(res)
+f1 <- suppressMessages(auto.arima(tsclean(k1)))
+f2 <- suppressMessages(auto.arima(tsclean(k2)))
+f3 <- suppressMessages(auto.arima(tsclean(g),stationary=TRUE))
+Msim <- array(NA,c(h,nc,nsim))
+set.seed(seed)
+if (jumpoff==1) {
+for (z in 1:nsim) { 
+k1sim <- simulate(f1,nsim=h)
+k2sim <- simulate(f2,nsim=h)
+gsim <- simulate(f3,nsim=h)
+ggsim <- c(g,gsim)
+for (i in 1:h) { for (j in 1:nc) { Msim[i,j,z] <- exp(k1sim[i]+k2sim[i]*(x[j]-mean(x))+ggsim[i-j+nc+nr]+rnorm(1,0,s)) }}
+}} 
+if (jumpoff==2) {
+for (z in 1:nsim) {
+k1sim <- simulate(f1,nsim=h)
+k2sim <- simulate(f2,nsim=h)
+gsim <- simulate(f3,nsim=h)
+ggsim <- c(g,gsim)
+for (i in 1:h) { for (j in 1:nc) { Msim[i,j,z] <- M[nr,j]*exp(k1sim[i]-k1[nr]+(k2sim[i]-k2[nr])*(x[j]-mean(x))+ggsim[i-j+nc+nr]-g[nr-j+nc]+rnorm(1,0,s)) }}
+}}
+list(Msim=Msim,sigma=s)
 }

@@ -16,12 +16,12 @@
 #' The model is estimated by regression and is forecasted by ARIMA applied to \eqn{\kappa_{1,t}} and \eqn{\kappa_{2,t}}. It is designed for ages 50-90.
 #'
 #' @importFrom forecast auto.arima tsclean forecast
-#' @importFrom stats fitted lm sd
+#' @importFrom stats fitted lm sd simulate rnorm
 #' @importFrom graphics par lines legend points image 
 #' @importFrom grDevices colorRampPalette
 #'
 #' @return
-#' An object of class CBDS with associated S3 methods coef, forecast, plot, and residuals.
+#' An object of class CBDS with associated S3 methods coef, forecast, plot, residuals, and simulate (nsim for setting number of simulations; seed for initialising random number generator).
 #'
 #' @references
 #' Cairns, A.J.G., Blake, D., and Dowd, K. (2006). A two-factor model for stochastic mortality with parameter uncertainty: Theory and calibration. Journal of Risk and Insurance, 73(4), 687-718.
@@ -53,16 +53,17 @@ if (h<1) { stop("h must be at least 1") }
 if (jumpoff!=1&&jumpoff!=2) { stop("jump-off must be either 1 or 2") }
 curve <- tryCatch(match.arg(curve),error = function(e) { stop("invalid curve choice") })
 tryCatch({
+nr <- nrow(M); nc <- ncol(M)
 k1 <- numeric(); k2 <- numeric()
-xx <- x-mean(x); for (i in 1:nrow(M)) { yy <- log(M[i,]); k1[i] <- as.numeric(lm(yy~xx)$coef[1]); k2[i] <- as.numeric(lm(yy~xx)$coef[2]) }
-res <- array(NA,c(nrow(M),ncol(M)))
-for (i in 1:nrow(M)) { for (j in 1:ncol(M)) { res[i,j] <- log(M[i,j])-k1[i]-k2[i]*(x[j]-mean(x)) }}
+xx <- x-mean(x); for (i in 1:nr) { yy <- log(M[i,]); k1[i] <- as.numeric(lm(yy~xx)$coef[1]); k2[i] <- as.numeric(lm(yy~xx)$coef[2]) }
+res <- array(NA,c(nr,nc))
+for (i in 1:nr) { for (j in 1:nc) { res[i,j] <- log(M[i,j])-k1[i]-k2[i]*(x[j]-mean(x)) }}
 res <- (res-mean(res))/sd(res)
 k1f <- suppressMessages(forecast(auto.arima(tsclean(k1)),h=h)$mean)
 k2f <- suppressMessages(forecast(auto.arima(tsclean(k2)),h=h)$mean)
-Mf <- array(NA,c(h,ncol(M))); Mfs <- array(NA,c(h,ncol(M)))
-if (jumpoff==1) { for (i in 1:h) { for (j in 1:ncol(M)) { Mf[i,j] <- exp(k1f[i]+k2f[i]*(x[j]-mean(x))) }}}
-if (jumpoff==2) { for (i in 1:h) { for (j in 1:ncol(M)) { Mf[i,j] <- M[nrow(M),j]*exp(k1f[i]-k1[nrow(M)]+(k2f[i]-k2[nrow(M)])*(x[j]-mean(x))) }}}
+Mf <- array(NA,c(h,nc)); Mfs <- array(NA,c(h,nc))
+if (jumpoff==1) { for (i in 1:h) { for (j in 1:nc) { Mf[i,j] <- exp(k1f[i]+k2f[i]*(x[j]-mean(x))) }}}
+if (jumpoff==2) { for (i in 1:h) { for (j in 1:nc) { Mf[i,j] <- M[nr,j]*exp(k1f[i]-k1[nr]+(k2f[i]-k2[nr])*(x[j]-mean(x))) }}}
 for (i in 1:h) { Mfs[i,] <- fitted(MC(x=x,m=Mf[i,],curve=curve)) }
 invisible(structure(
 list(curve=curve,x=x,M=M,h=h,jumpoff=jumpoff,kappa1=k1,kappa2=k2,standardresiduals=res,forecast=Mf,smoothforecast=Mfs),
@@ -100,4 +101,39 @@ legend("bottomright",legend=c("observed first data","observed last data",temp),p
 #' @export
 residuals.CBDS <- function(object,...) {
 object$standardresiduals
+}
+
+#' @export
+simulate.CBDS <- function(object,nsim=10,seed=123,...) {
+if (!is.numeric(nsim)||nsim!=floor(nsim)||nsim<1||!is.numeric(seed)||seed!=floor(seed)||seed<1) { stop("nsim and seed must be positive integers") }
+x <- object$x; M <- object$M; h <- object$h; jumpoff <- object$jumpoff
+k1 <- object$kappa1; k2 <- object$kappa2
+nr <- nrow(M); nc <- ncol(M)
+k1mat <- matrix(k1,nr,nc,byrow=FALSE)
+k2mat <- matrix(k2,nr,nc,byrow=FALSE)
+xmat <- matrix(x-mean(x),nr,nc,byrow=TRUE)
+res <- log(M)-k1mat-k2mat*xmat
+s <- sd(res)
+f1 <- suppressMessages(auto.arima(tsclean(k1)))
+f2 <- suppressMessages(auto.arima(tsclean(k2)))
+Msim <- array(NA,c(h,nc,nsim))
+xm <- matrix(x-mean(x),h,nc,byrow=TRUE)
+set.seed(seed)
+if (jumpoff==1) {
+for (z in 1:nsim) { 
+k1sim <- simulate(f1,nsim=h)
+k2sim <- simulate(f2,nsim=h)
+k1m <- matrix(k1sim,h,nc,byrow=FALSE)
+k2m <- matrix(k2sim,h,nc,byrow=FALSE)
+Msim[,,z] <- exp(k1m+k2m*xm+matrix(rnorm(h*nc,0,s),h,nc,byrow=TRUE))
+}} 
+if (jumpoff==2) {
+for (z in 1:nsim) {
+k1sim <- simulate(f1,nsim=h)
+k2sim <- simulate(f2,nsim=h)
+k1m <- matrix(k1sim,h,nc,byrow=FALSE)
+k2m <- matrix(k2sim,h,nc,byrow=FALSE)
+Msim[,,z] <- exp(matrix(log(M[nr,]),h,nc,byrow=TRUE)+k1m-matrix(k1[nr],h,nc,byrow=FALSE)+(k2m-matrix(k2[nr],h,nc,byrow=FALSE))*xm+matrix(rnorm(h*nc,0,s),h,nc,byrow=TRUE))
+}}
+list(Msim=Msim,sigma=s)
 }

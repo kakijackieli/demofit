@@ -16,12 +16,12 @@
 #' The model is estimated by singular value decomposition and is forecasted by ARIMA applied to \eqn{\kappa_t}. Constraints include sum of \eqn{\beta_x} is one and sum of \eqn{\kappa_t} is zero. It can be applied to whole age range.
 #'
 #' @importFrom forecast auto.arima tsclean forecast
-#' @importFrom stats fitted prcomp sd
+#' @importFrom stats fitted prcomp sd simulate rnorm
 #' @importFrom graphics par lines legend points image 
 #' @importFrom grDevices colorRampPalette
 #'
 #' @return
-#' An object of class LCS with associated S3 methods coef, forecast, plot, and residuals.
+#' An object of class LCS with associated S3 methods coef, forecast, plot, residuals, and simulate (nsim for setting number of simulations; seed for initialising random number generator).
 #'
 #' @references
 #' Lee, R.D. and Carter, L.R. (1992). Modeling and forecasting U.S. mortality. Journal of the American Statistical Association, 87(419), 659-671.
@@ -60,17 +60,18 @@ if (h<1) { stop("h must be at least 1") }
 if (jumpoff!=1&&jumpoff!=2) { stop("jump-off must be either 1 or 2") }
 curve <- tryCatch(match.arg(curve),error = function(e) { stop("invalid curve choice") })
 tryCatch({
+nr <- nrow(M); nc <- ncol(M)
 PCA <- prcomp(log(M),center=TRUE,scale=FALSE)
-a <- numeric(); for (j in 1:ncol(M)) { a[j] <- mean(log(M[,j])) }
+a <- numeric(); for (j in 1:nc) { a[j] <- mean(log(M[,j])) }
 b <- PCA$rotation[,1]/sum(PCA$rotation[,1])
 k <- PCA$x[,1]*sum(PCA$rotation[,1])
-res <- array(NA,c(nrow(M),ncol(M)))
-for (i in 1:nrow(M)) { for (j in 1:ncol(M)) { res[i,j] <- log(M[i,j])-a[j]-b[j]*k[i] }}
+res <- array(NA,c(nr,nc))
+for (i in 1:nr) { for (j in 1:nc) { res[i,j] <- log(M[i,j])-a[j]-b[j]*k[i] }}
 res <- (res-mean(res))/sd(res)
 kf <- suppressMessages(forecast(auto.arima(tsclean(k)),h=h)$mean)
-Mf <- array(NA,c(h,ncol(M))); Mfs <- array(NA,c(h,ncol(M)))
-if (jumpoff==1) { for (i in 1:h) { for (j in 1:ncol(M)) { Mf[i,j] <- exp(a[j]+b[j]*kf[i]) }}}
-if (jumpoff==2) { for (i in 1:h) { for (j in 1:ncol(M)) { Mf[i,j] <- M[nrow(M),j]*exp(b[j]*(kf[i]-k[nrow(M)])) }}}
+Mf <- array(NA,c(h,nc)); Mfs <- array(NA,c(h,nc))
+if (jumpoff==1) { for (i in 1:h) { for (j in 1:nc) { Mf[i,j] <- exp(a[j]+b[j]*kf[i]) }}}
+if (jumpoff==2) { for (i in 1:h) { for (j in 1:nc) { Mf[i,j] <- M[nr,j]*exp(b[j]*(kf[i]-k[nr])) }}}
 for (i in 1:h) { Mfs[i,] <- fitted(MC(x=x,m=Mf[i,],curve=curve)) }
 invisible(structure(
 list(curve=curve,x=x,M=M,h=h,jumpoff=jumpoff,alpha=a,beta=b,kappa=k,standardresiduals=res,forecast=Mf,smoothforecast=Mfs),
@@ -109,4 +110,35 @@ legend("bottomright",legend=c("observed first data","observed last data",temp),p
 #' @export
 residuals.LCS <- function(object,...) {
 object$standardresiduals
+}
+
+#' @export
+simulate.LCS <- function(object,nsim=10,seed=123,...) {
+if (!is.numeric(nsim)||nsim!=floor(nsim)||nsim<1||!is.numeric(seed)||seed!=floor(seed)||seed<1) { stop("nsim and seed must be positive integers") }
+M <- object$M; h <- object$h; jumpoff <- object$jumpoff
+a <- object$alpha; b <- object$beta; k <- object$kappa
+nr <- nrow(M); nc <- ncol(M)
+amat <- matrix(a,nr,nc,byrow=TRUE)
+bmat <- matrix(b,nr,nc,byrow=TRUE)
+kmat <- matrix(k,nr,nc,byrow=FALSE)
+res <- log(M)-amat-bmat*kmat
+s <- sd(res)
+f <- suppressMessages(auto.arima(tsclean(k)))
+Msim <- array(NA,c(h,nc,nsim))
+am <- matrix(a,h,nc,byrow=TRUE)
+bm <- matrix(b,h,nc,byrow=TRUE)
+set.seed(seed)
+if (jumpoff==1) {
+for (z in 1:nsim) {
+ksim <- simulate(f,nsim=h)
+km <- matrix(ksim,h,nc,byrow=FALSE)
+Msim[,,z] <- exp(am+bm*km+matrix(rnorm(h*nc,0,s),h,nc,byrow=TRUE))
+}} 
+if (jumpoff==2) {
+for (z in 1:nsim) {
+ksim <- simulate(f,nsim=h)
+km <- matrix(ksim,h,nc,byrow=FALSE)
+Msim[,,z] <- exp(matrix(log(M[nr,]),h,nc,byrow=TRUE)+bm*(km-matrix(k[nr],h,nc,byrow=FALSE))+matrix(rnorm(h*nc,0,s),h,nc,byrow=TRUE))
+}}
+list(Msim=Msim,sigma=s)
 }
