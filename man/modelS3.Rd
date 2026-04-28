@@ -4,13 +4,15 @@
 \alias{modelS3}
 \title{Common S3 methods for stochastic mortality models}
 \description{
-Common S3 methods for objects returned by \code{LCS()}, \code{RHS()}, \code{APCS()}, \code{CBDS()}, \code{CBDCS()}, \code{CBDQCS()}, and \code{STARS()}:
+Common S3 methods for objects returned by \code{LCS()}, \code{RHS()}, \code{APCS()}, \code{CBDS()}, \code{CBDCS()}, \code{CBDQCS()}, \code{STARS()}, \code{ENS()}, \code{ENI()}, \code{CFMS()}, \code{CFM2S()}, and \code{CAES()}:
 
 coef(object) gives estimated parameter values.
 
-forecast::forecast(object) gives mortality forecasts smoothed by selected mortality curve.
+forecast::forecast(object) gives mortality forecasts smoothed by selected mortality curve (or ensemble interval forecasts for \code{ENI()}).
 
-plot(object) plots estimated parameter values, standardised residuals heatmap, data, and mortality forecasts smoothed by selected mortality curve.
+plot(object) plots estimated parameter values, standardised residuals heatmap, data, and mortality forecasts smoothed by selected mortality curve (or ensemble interval forecasts for \code{ENI()}).
 
 residuals(object) gives standardised residuals on \eqn{ln(m_{x,t})}.
+
+simulate(object,nsim,seed) gives simulated future mortality rates (unsmoothed).
 }

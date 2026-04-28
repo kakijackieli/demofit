@@ -53,3 +53,6 @@ forecast::forecast(fit)
 plot(fit)
 
 }
+\references{
+Li, J. (2023). A model stacking approach for forecasting mortality. North American Actuarial Journal, 27(3), 530-545.
+}

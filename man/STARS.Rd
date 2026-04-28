@@ -25,7 +25,7 @@ STARS(
 \item{h}{forecast horizon (default = 10).}
 }
 \value{
-An object of class STARS with associated S3 methods coef, forecast, plot, and residuals.
+An object of class STARS with associated S3 methods coef, forecast, plot, residuals, and simulate (nsim for setting number of simulations; seed for initialising random number generator).
 }
 \description{
 Fits and forecasts mortality rates using spatial-temporal autoregressive model.
