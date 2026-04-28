@@ -9,12 +9,13 @@ Description:
  For modelling details see: 
  Tabeau (2001) <doi:10.1007/0-306-47562-6_1>, 
  Renshaw and Haberman (2006) <doi:10.1016/j.insmatheco.2005.12.001>, 
- Cairns et al. (2009) <doi:10.1080/10920277.2009.10597538>.
+ Cairns et al. (2009) <doi:10.1080/10920277.2009.10597538>,
+ Li and Lee (2005) <doi: 10.1353/dem.2005.0021>.
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-Imports: forecast, minpack.lm, MortalityLaws, NlcOptim, stats, graphics, grDevices
+Imports: forecast, minpack.lm, MortalityLaws, NlcOptim, stats, MASS, graphics, grDevices
 Suggests: knitr, rmarkdown
 VignetteBuilder: knitr
