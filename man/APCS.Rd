@@ -28,7 +28,7 @@ APCS(
 \item{jumpoff}{if 1, forecasts are based on estimated parameters only; if 2, forecasts are anchored to observed mortality rates in final year (default = 1).}
 }
 \value{
-An object of class APCS with associated S3 methods coef, forecast, plot, residuals, and simulate (nsim for setting number of simulations; seed for initialising random number generator).
+An object of class APCS with associated S3 methods coef, forecast (which = 1 for smoothed (default); which = 2 for raw), plot, residuals, and simulate (nsim for setting number of simulations; seed for initialising random number generator).
 }
 \description{
 Fits and forecasts mortality rates using age-period-cohort model.

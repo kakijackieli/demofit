@@ -4,15 +4,15 @@
 \alias{modelS3}
 \title{Common S3 methods for stochastic mortality models}
 \description{
-Common S3 methods for objects returned by \code{LCS()}, \code{RHS()}, \code{APCS()}, \code{CBDS()}, \code{CBDCS()}, \code{CBDQCS()}, \code{STARS()}, \code{ENS()}, \code{ENI()}, \code{CFMS()}, \code{CFM2S()}, and \code{CAES()}:
+Common S3 methods for objects returned by \code{LCS()}, \code{RHS()}, \code{APCS()}, \code{CBDS()}, \code{CBDCS()}, \code{CBDQCS()}, \code{STARS()}, \code{ENS()}, \code{ENI()}, \code{CFMS()}, \code{CFM2S()}, \code{CAES()}, \code{PLCS()}, \code{PRHS()}, \code{PAPCS()}, \code{PCBDS()}, \code{PCBDCS()}, \code{PCBDQCS()}, \code{PCFMS()}, \code{PCFM2S()}, \code{PCAES()}, and \code{LCLS()}.
 
 coef(object) gives estimated parameter values.
 
-forecast::forecast(object) gives mortality forecasts smoothed by selected mortality curve (or ensemble interval forecasts for \code{ENI()}).
+forecast::forecast(object) gives mortality forecasts (which = 1 for smoothed (default); which = 2 for raw) (or ensemble interval forecasts for \code{ENI()}).
 
 plot(object) plots estimated parameter values, standardised residuals heatmap, data, and mortality forecasts smoothed by selected mortality curve (or ensemble interval forecasts for \code{ENI()}).
 
-residuals(object) gives standardised residuals on \eqn{ln(m_{x,t})}.
+residuals(object) gives standardised residuals on \eqn{ln(m_{x,t})} or \eqn{D_{x,t}}.
 
-simulate(object,nsim,seed) gives simulated future mortality rates (unsmoothed).
+simulate(object,nsim,seed) gives simulated future mortality rates (raw).
 }

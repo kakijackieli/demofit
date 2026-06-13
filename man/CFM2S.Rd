@@ -31,7 +31,7 @@ CFM2S(
 \item{jumpoff}{if 1, forecasts are based on estimated parameters only; if 2, forecasts are anchored to observed mortality rates in final year (default = 1).}
 }
 \value{
-An object of class CFM2S with associated S3 methods coef, forecast, plot (which = 1 gives parameter estimates; which = 2 gives residuals and forecasts), and residuals.
+An object of class CFM2S with associated S3 methods coef, forecast (which = 1 for smoothed (default); which = 2 for raw), plot (which = 1 gives parameter estimates (default); which = 2 gives residuals and forecasts), and residuals.
 }
 \description{
 Fits and forecasts mortality rates of two populations using common factor model with global age pattern.
