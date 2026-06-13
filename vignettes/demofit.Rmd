@@ -18,7 +18,7 @@ library(demofit)
 
 The demofit package provides a unified framework for mortality modelling.
 
-## Example: Mortality curve fitting
+## Example: Mortality curve fitting - MC()
 
 ```{r}
 x <- 60:89
@@ -27,7 +27,7 @@ fit <- MC(x=x,m=m,curve="gompertz")
 plot(fit)
 ```
 
-## Example: Mortality model fitting and forecasting
+## Example: Mortality model fitting and forecasting - FCS()
 
 ```{r}
 x <- 60:89
@@ -46,7 +46,7 @@ fit <- FCS(x=x,M=M,model="LC",curve="makeham",h=30,jumpoff=2)
 plot(fit)
 ```
 
-## Example: Common factor model
+## Example: Two-population mortality model fitting and forecasting - CFMS()
 
 ```{r}
 x <- 60:89
@@ -81,7 +81,7 @@ fit <- CFMS(x=x,M1=M1,M2=M2,curve="makeham",h=30,jumpoff=2)
 plot(fit)
 ```
 
-## Example: Mortality ensemble interval
+## Example: Mortality ensemble interval forecasting - ENI()
 
 ```{r}
 x <- 60:69
