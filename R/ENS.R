@@ -56,8 +56,10 @@ class="ENS"
 }
 
 #' @export
-forecast.ENS <- function(object,...) {
-object$smoothforecast
+forecast.ENS <- function(object,which=1,...) {
+if (length(which)!=1||!(which%in%c(1,2))) { stop("which must be 1 or 2") }
+if (which==1) { object$smoothforecast }
+else if (which==2) { object$forecast }
 }
 
 #' @export

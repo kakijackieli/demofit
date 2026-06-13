@@ -1,19 +1,20 @@
-#' Lee-Carter model
+#' Poisson Lee-Carter model
 #'
-#' Fits and forecasts mortality rates using Lee-Carter model.
+#' Fits and forecasts mortality rates using Lee-Carter model with Poisson assumption.
 #'
 #' @param x vector of ages.
-#' @param M matrix of mortality rates (rows as years and columns as ages).
+#' @param D matrix of death counts (rows as years and columns as ages).
+#' @param E matrix of mid-year exposures (rows as years and columns as ages).
 #' @param curve name of mortality curve for smoothing forecasted mortality rates (including gompertz, makeham, oppermann, thiele, wittsteinbumsted, perks, weibull, vandermaen, beard, heligmanpollard, rogersplanck, siler, martinelle, thatcher, gompertz2, makeham2, oppermann2, thiele2, wittsteinbumsted2, perks2, weibull2, vandermaen2, beard2, heligmanpollard2, rogersplanck2, siler2, martinelle2, thatcher2, where first 14 curves' parameters are unconstrained and last 14 curves' parameters are generally restricted to be positive).
 #' @param h forecast horizon (default = 10).
 #' @param jumpoff if 1, forecasts are based on estimated parameters only; if 2, forecasts are anchored to observed mortality rates in final year (default = 1). 
 #'
 #' @details
-#' The Lee-Carter (LC) model is specified as 
+#' The Lee-Carter (LC) model with Poisson assumption is specified as 
 #' 
-#' \eqn{ln(m_{x,t}) = \alpha_x + \beta_x \kappa_t + \epsilon_{x,t}}.
+#' \eqn{ln(m_{x,t}) = \alpha_x + \beta_x \kappa_t} and \eqn{D_{x,t} ~ Poisson(E_{x,t} m_{x,t})}.
 #'
-#' The model is estimated by singular value decomposition and is forecasted by ARIMA applied to \eqn{\kappa_t}. Constraints include sum of \eqn{\beta_x} is one and sum of \eqn{\kappa_t} is zero. It can be applied to whole age range.
+#' The model is estimated by Newton updating scheme and is forecasted by ARIMA applied to \eqn{\kappa_t}. Constraints include sum of \eqn{\beta_x} is one and sum of \eqn{\kappa_t} is zero. It can be applied to whole age range.
 #'
 #' @importFrom forecast auto.arima tsclean forecast
 #' @importFrom stats fitted prcomp sd simulate rnorm
@@ -21,10 +22,10 @@
 #' @importFrom grDevices colorRampPalette
 #'
 #' @return
-#' An object of class LCS with associated S3 methods coef, forecast (which = 1 for smoothed (default); which = 2 for raw), plot, residuals, and simulate (nsim for setting number of simulations; seed for initialising random number generator).
+#' An object of class PLCS with associated S3 methods coef, forecast (which = 1 for smoothed (default); which = 2 for raw), plot, and residuals.
 #'
 #' @references
-#' Lee, R.D. and Carter, L.R. (1992). Modeling and forecasting U.S. mortality. Journal of the American Statistical Association, 87(419), 659-671.
+#' Renshaw, A.E. and Haberman, S. (2006). A cohort-based extension to the Lee–Carter model for mortality reduction factors. Insurance: Mathematics and Economics, 38(3), 556-570.
 #'
 #' @examples
 #' x <- 60:89
@@ -39,61 +40,78 @@
 #' -5.18,-5.64,-6,-6.51,-6.91,-6.9,-8.32,-8.53,-9.69,-9.31)
 #' set.seed(123)
 #' M <- exp(outer(k,b)+matrix(a,nrow=30,ncol=30,byrow=TRUE)+rnorm(900,0,0.035))
-#' fit <- LCS(x=x,M=M,curve="makeham",h=30,jumpoff=2)
+#' E <- matrix(c(107788,108036,107481,106552,104608,100104,95803,91345,84980,79557,
+#' 75146,70559,65972,60898,55623,50522,47430,45895,41443,34774,
+#' 30531,27754,25105,22271,19437,16888,14458,12146,10038,7994),30,30,byrow=TRUE)
+#' D <- round(E*M)
+#' fit <- PLCS(x=x,D=D,E=E,curve="makeham",h=30,jumpoff=2)
 #' coef(fit)
 #' forecast::forecast(fit)
 #' plot(fit)
 #' residuals(fit)
 #'
 #' @export
-LCS <- function(x,M,curve=c("gompertz","makeham","oppermann","thiele","wittsteinbumsted","perks","weibull","vandermaen","beard","heligmanpollard","rogersplanck","siler","martinelle","thatcher","gompertz2","makeham2","oppermann2","thiele2","wittsteinbumsted2","perks2","weibull2","vandermaen2","beard2","heligmanpollard2","rogersplanck2","siler2","martinelle2","thatcher2"),h=10,jumpoff=1) {
-if (!is.numeric(x)||!is.numeric(M)) { stop("x and M must be numeric") }
+PLCS <- function(x,D,E,curve=c("gompertz","makeham","oppermann","thiele","wittsteinbumsted","perks","weibull","vandermaen","beard","heligmanpollard","rogersplanck","siler","martinelle","thatcher","gompertz2","makeham2","oppermann2","thiele2","wittsteinbumsted2","perks2","weibull2","vandermaen2","beard2","heligmanpollard2","rogersplanck2","siler2","martinelle2","thatcher2"),h=10,jumpoff=1) {
+if (!is.numeric(x)||!is.numeric(D)||!is.numeric(E)) { stop("x and D and E must be numeric") }
 if (!is.vector(x)) { stop("x must be a vector") }
-if (!is.matrix(M)) stop("M must be a matrix with its rows as years and columns as ages")
-if (length(x)!=ncol(M)) stop("the number of ages must match the number of columns of M")
+if (!is.matrix(D)||!is.matrix(E)||nrow(D)!=nrow(E)) stop("D and E must be a matrix with its rows as years and columns as ages")
+if (length(x)!=ncol(D)||length(x)!=ncol(E)) stop("the number of ages must match the number of columns of D and E")
 if (is.unsorted(x,strictly=TRUE)) { stop("x must be in ascending order") }
 if (any(x<0)) { stop("x must be non-negative") }
-if (any(M<=0)) { stop("all M values must be positive") }
-if (nrow(M)<20) stop("it requires at least 20 years of data for this forecast")
+if (any(D<=0)||any(E<=0)) { stop("all D and E values must be positive") }
+if (nrow(D)<20) stop("it requires at least 20 years of data for this forecast")
 if (!is.numeric(h)||!is.numeric(jumpoff)) { stop("h and jumpoff must be numeric") }
 if (h<1) { stop("h must be at least 1") }
 if (jumpoff!=1&&jumpoff!=2) { stop("jump-off must be either 1 or 2") }
 curve <- tryCatch(match.arg(curve),error = function(e) { stop("invalid curve choice") })
 tryCatch({
+M <- D/E
 nr <- nrow(M); nc <- ncol(M)
 PCA <- prcomp(log(M),center=TRUE,scale=FALSE)
 a <- numeric(); for (j in 1:nc) { a[j] <- mean(log(M[,j])) }
 b <- PCA$rotation[,1]/sum(PCA$rotation[,1])
 k <- PCA$x[,1]*sum(PCA$rotation[,1])
-res <- array(NA,c(nr,nc))
-for (i in 1:nr) { for (j in 1:nc) { res[i,j] <- log(M[i,j])-a[j]-b[j]*k[i] }}
-res <- res/sd(res)
+olde <- 1000000000; tol <- 1e-8
+for (z in 1:200) {
+amat <- matrix(a,nr,nc,byrow=TRUE); bmat <- matrix(b,nr,nc,byrow=TRUE); kmat <- matrix(k,nr,nc,byrow=FALSE); Emat <- E*exp(amat+bmat*kmat)
+a <- a+colSums(D-Emat)/colSums(Emat)
+amat <- matrix(a,nr,nc,byrow=TRUE); bmat <- matrix(b,nr,nc,byrow=TRUE); kmat <- matrix(k,nr,nc,byrow=FALSE); Emat <- E*exp(amat+bmat*kmat)
+b <- b+colSums((D-Emat)*kmat)/colSums(Emat*kmat^2); b <- b/sum(b)
+amat <- matrix(a,nr,nc,byrow=TRUE); bmat <- matrix(b,nr,nc,byrow=TRUE); kmat <- matrix(k,nr,nc,byrow=FALSE); Emat <- E*exp(amat+bmat*kmat)
+k <- k+rowSums((D-Emat)*bmat)/rowSums(Emat*bmat^2); k <- k-mean(k)
+amat <- matrix(a,nr,nc,byrow=TRUE); bmat <- matrix(b,nr,nc,byrow=TRUE); kmat <- matrix(k,nr,nc,byrow=FALSE); Emat <- E*exp(amat+bmat*kmat)
+newe <- sum(D*log(D/Emat)-D+Emat)
+if (z>10&&olde-newe<tol&&olde>newe) { break }
+olde <- newe
+}
+dis <- sum(2*(D*log(D/Emat)-D+Emat))/(nr*nc-length(a)-length(b)-length(k)+2)
+res <- sign(D-Emat)*sqrt(2*(D*log(D/Emat)-D+Emat)/dis)
 kf <- suppressMessages(forecast(auto.arima(tsclean(k)),h=h)$mean)
 Mf <- array(NA,c(h,nc)); Mfs <- array(NA,c(h,nc))
 if (jumpoff==1) { for (i in 1:h) { for (j in 1:nc) { Mf[i,j] <- exp(a[j]+b[j]*kf[i]) }}}
 if (jumpoff==2) { for (i in 1:h) { for (j in 1:nc) { Mf[i,j] <- M[nr,j]*exp(b[j]*(kf[i]-k[nr])) }}}
 for (i in 1:h) { Mfs[i,] <- fitted(MC(x=x,m=Mf[i,],curve=curve)) }
 invisible(structure(
-list(curve=curve,x=x,M=M,h=h,jumpoff=jumpoff,alpha=a,beta=b,kappa=k,standardresiduals=res,forecast=Mf,smoothforecast=Mfs),
-class="LCS"
+list(curve=curve,x=x,D=D,E=E,M=M,h=h,jumpoff=jumpoff,alpha=a,beta=b,kappa=k,standardresiduals=res,dispersion=dis,forecast=Mf,smoothforecast=Mfs),
+class="PLCS"
 ))
 }, error = function(e) { stop(paste0("model fitting and forecasting are unsuccessful - please make sure the data and age range are suitable for the model and curve\n",e$message),call.=FALSE) })
 }
 
 #' @export
-coef.LCS <- function(object,...) {
+coef.PLCS <- function(object,...) {
 list(alpha=object$alpha,beta=object$beta,kappa=object$kappa)
 }
 
 #' @export
-forecast.LCS <- function(object,which=1,...) {
+forecast.PLCS <- function(object,which=1,...) {
 if (length(which)!=1||!(which%in%c(1,2))) { stop("which must be 1 or 2") }
 if (which==1) { object$smoothforecast }
 else if (which==2) { object$forecast }
 }
 
 #' @export
-plot.LCS <- function(x,...) {
+plot.PLCS <- function(x,...) {
 old <- par(no.readonly=TRUE)
 on.exit(par(old))
 par(mfrow=c(3,2),mar=c(3.5,2.5,1.5,0.5),mgp=c(1.5,0.5,0))
@@ -110,37 +128,6 @@ legend("bottomright",legend=c("observed first data","observed last data",temp),p
 }
 
 #' @export
-residuals.LCS <- function(object,...) {
+residuals.PLCS <- function(object,...) {
 object$standardresiduals
-}
-
-#' @export
-simulate.LCS <- function(object,nsim=10,seed=123,...) {
-if (!is.numeric(nsim)||nsim!=floor(nsim)||nsim<1||!is.numeric(seed)||seed!=floor(seed)||seed<1) { stop("nsim and seed must be positive integers") }
-M <- object$M; h <- object$h; jumpoff <- object$jumpoff
-a <- object$alpha; b <- object$beta; k <- object$kappa
-nr <- nrow(M); nc <- ncol(M)
-amat <- matrix(a,nr,nc,byrow=TRUE)
-bmat <- matrix(b,nr,nc,byrow=TRUE)
-kmat <- matrix(k,nr,nc,byrow=FALSE)
-res <- log(M)-amat-bmat*kmat
-s <- sd(res)
-f <- suppressMessages(auto.arima(tsclean(k)))
-Msim <- array(NA,c(h,nc,nsim))
-am <- matrix(a,h,nc,byrow=TRUE)
-bm <- matrix(b,h,nc,byrow=TRUE)
-set.seed(seed)
-if (jumpoff==1) {
-for (z in 1:nsim) {
-ksim <- simulate(f,nsim=h)
-km <- matrix(ksim,h,nc,byrow=FALSE)
-Msim[,,z] <- exp(am+bm*km+matrix(rnorm(h*nc,0,s),h,nc,byrow=TRUE))
-}} 
-if (jumpoff==2) {
-for (z in 1:nsim) {
-ksim <- simulate(f,nsim=h)
-km <- matrix(ksim,h,nc,byrow=FALSE)
-Msim[,,z] <- exp(matrix(log(M[nr,]),h,nc,byrow=TRUE)+bm*(km-matrix(k[nr],h,nc,byrow=FALSE))+matrix(rnorm(h*nc,0,s),h,nc,byrow=TRUE))
-}}
-list(Msim=Msim,sigma=s)
 }

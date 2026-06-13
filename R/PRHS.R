@@ -1,17 +1,18 @@
-#' Renshaw-Haberman model
+#' Poisson Renshaw-Haberman model
 #'
-#' Fits and forecasts mortality rates using Renshaw-Haberman model.
+#' Fits and forecasts mortality rates using Renshaw-Haberman model with Poisson assumption.
 #'
 #' @param x vector of ages.
-#' @param M matrix of mortality rates (rows as years and columns as ages).
+#' @param D matrix of death counts (rows as years and columns as ages).
+#' @param E matrix of mid-year exposures (rows as years and columns as ages).
 #' @param curve name of mortality curve for smoothing forecasted mortality rates (including gompertz, makeham, oppermann, thiele, wittsteinbumsted, perks, weibull, vandermaen, beard, heligmanpollard, rogersplanck, siler, martinelle, thatcher, gompertz2, makeham2, oppermann2, thiele2, wittsteinbumsted2, perks2, weibull2, vandermaen2, beard2, heligmanpollard2, rogersplanck2, siler2, martinelle2, thatcher2, where first 14 curves' parameters are unconstrained and last 14 curves' parameters are generally restricted to be positive).
 #' @param h forecast horizon (default = 10).
 #' @param jumpoff if 1, forecasts are based on estimated parameters only; if 2, forecasts are anchored to observed mortality rates in final year (default = 1). 
 #'
 #' @details
-#' The Renshaw-Haberman (RH) model is specified as 
+#' The Renshaw-Haberman (RH) model with Poisson assumption is specified as 
 #' 
-#' \eqn{ln(m_{x,t}) = \alpha_x + \beta_x \kappa_t + \gamma_{t-x} + \epsilon_{x,t}}.
+#' \eqn{ln(m_{x,t}) = \alpha_x + \beta_x \kappa_t + \gamma_{t-x}} and \eqn{D_{x,t} ~ Poisson(E_{x,t} m_{x,t})}.
 #'
 #' The model is estimated by Newton updating scheme and is forecasted by ARIMA applied to \eqn{\kappa_t} and \eqn{\gamma_c}. Constraints include sum of \eqn{\beta_x} is one, sum of \eqn{\kappa_t} is zero, and sum of \eqn{\gamma_c} is zero. It can be applied to whole age range.
 #'
@@ -21,7 +22,7 @@
 #' @importFrom grDevices colorRampPalette
 #'
 #' @return
-#' An object of class RHS with associated S3 methods coef, forecast (which = 1 for smoothed (default); which = 2 for raw), plot, residuals, and simulate (nsim for setting number of simulations; seed for initialising random number generator).
+#' An object of class PRHS with associated S3 methods coef, forecast (which = 1 for smoothed (default); which = 2 for raw), plot, and residuals.
 #'
 #' @references
 #' Haberman, S. and Renshaw, A. (2011). A comparative study of parametric mortality projection models. Insurance: Mathematics and Economics, 48(1), 35-55.
@@ -39,51 +40,55 @@
 #' -5.18,-5.64,-6,-6.51,-6.91,-6.9,-8.32,-8.53,-9.69,-9.31)
 #' set.seed(123)
 #' M <- exp(outer(k,b)+matrix(a,nrow=30,ncol=30,byrow=TRUE)+rnorm(900,0,0.035))
-#' fit <- RHS(x=x,M=M,curve="makeham",h=30,jumpoff=2)
+#' E <- matrix(c(107788,108036,107481,106552,104608,100104,95803,91345,84980,79557,
+#' 75146,70559,65972,60898,55623,50522,47430,45895,41443,34774,
+#' 30531,27754,25105,22271,19437,16888,14458,12146,10038,7994),30,30,byrow=TRUE)
+#' D <- round(E*M)
+#' fit <- PRHS(x=x,D=D,E=E,curve="makeham",h=30,jumpoff=2)
 #' coef(fit)
 #' forecast::forecast(fit)
 #' plot(fit)
 #' residuals(fit)
 #'
 #' @export
-RHS <- function(x,M,curve=c("gompertz","makeham","oppermann","thiele","wittsteinbumsted","perks","weibull","vandermaen","beard","heligmanpollard","rogersplanck","siler","martinelle","thatcher","gompertz2","makeham2","oppermann2","thiele2","wittsteinbumsted2","perks2","weibull2","vandermaen2","beard2","heligmanpollard2","rogersplanck2","siler2","martinelle2","thatcher2"),h=10,jumpoff=1) {
-if (!is.numeric(x)||!is.numeric(M)) { stop("x and M must be numeric") }
+PRHS <- function(x,D,E,curve=c("gompertz","makeham","oppermann","thiele","wittsteinbumsted","perks","weibull","vandermaen","beard","heligmanpollard","rogersplanck","siler","martinelle","thatcher","gompertz2","makeham2","oppermann2","thiele2","wittsteinbumsted2","perks2","weibull2","vandermaen2","beard2","heligmanpollard2","rogersplanck2","siler2","martinelle2","thatcher2"),h=10,jumpoff=1) {
+if (!is.numeric(x)||!is.numeric(D)||!is.numeric(E)) { stop("x and D and E must be numeric") }
 if (!is.vector(x)) { stop("x must be a vector") }
-if (!is.matrix(M)) stop("M must be a matrix with its rows as years and columns as ages")
-if (length(x)!=ncol(M)) stop("the number of ages must match the number of columns of M")
+if (!is.matrix(D)||!is.matrix(E)||nrow(D)!=nrow(E)) stop("D and E must be a matrix with its rows as years and columns as ages")
+if (length(x)!=ncol(D)||length(x)!=ncol(E)) stop("the number of ages must match the number of columns of D and E")
 if (is.unsorted(x,strictly=TRUE)) { stop("x must be in ascending order") }
 if (any(x<0)) { stop("x must be non-negative") }
-if (any(M<=0)) { stop("all M values must be positive") }
-if (nrow(M)<20) stop("it requires at least 20 years of data for this forecast")
+if (any(D<=0)||any(E<=0)) { stop("all D and E values must be positive") }
+if (nrow(D)<20) stop("it requires at least 20 years of data for this forecast")
 if (!is.numeric(h)||!is.numeric(jumpoff)) { stop("h and jumpoff must be numeric") }
 if (h<1) { stop("h must be at least 1") }
 if (jumpoff!=1&&jumpoff!=2) { stop("jump-off must be either 1 or 2") }
 curve <- tryCatch(match.arg(curve),error = function(e) { stop("invalid curve choice") })
 tryCatch({
+M <- D/E
 nr <- nrow(M); nc <- ncol(M)
-PCA <- prcomp(log(M),center=TRUE,scale=FALSE)
-a <- numeric(); for (j in 1:nc) { a[j] <- mean(log(M[,j])) }
-b <- PCA$rotation[,1]/sum(PCA$rotation[,1])
-k <- PCA$x[,1]*sum(PCA$rotation[,1])
-g <- rep(0,nr+nc-1)
-olde <- 1000000; tol <- 1e-8
+fit <- RHS(x,M,curve,h,jumpoff)
+a <- coef(fit)$alpha
+b <- coef(fit)$beta
+k <- coef(fit)$kappa
+g <- coef(fit)$gamma
+olde <- 1000000000; tol <- 1e-8
 for (z in 1:200) {
-amat <- matrix(a,nr,nc,byrow=TRUE); bmat <- matrix(b,nr,nc,byrow=TRUE); kmat <- matrix(k,nr,nc,byrow=FALSE); gmat <- g[row(M)-col(M)+nc]
-a <- a+colSums(log(M)-amat-bmat*kmat-gmat)/nr
-amat <- matrix(a,nr,nc,byrow=TRUE); bmat <- matrix(b,nr,nc,byrow=TRUE); kmat <- matrix(k,nr,nc,byrow=FALSE); gmat <- g[row(M)-col(M)+nc]
-b <- b+colSums((log(M)-amat-bmat*kmat-gmat)*kmat)/sum(k^2); b <- b/sum(b)
-amat <- matrix(a,nr,nc,byrow=TRUE); bmat <- matrix(b,nr,nc,byrow=TRUE); kmat <- matrix(k,nr,nc,byrow=FALSE); gmat <- g[row(M)-col(M)+nc]
-k <- k+rowSums((log(M)-amat-bmat*kmat-gmat)*bmat)/sum(b^2); k <- k-mean(k)
-amat <- matrix(a,nr,nc,byrow=TRUE); bmat <- matrix(b,nr,nc,byrow=TRUE); kmat <- matrix(k,nr,nc,byrow=FALSE); gmat <- g[row(M)-col(M)+nc]
-g <- g+as.numeric(tapply(as.vector(log(M)-amat-bmat*kmat-gmat),as.vector(row(M)-col(M)+nc),mean)); g <- g-mean(g)
-amat <- matrix(a,nr,nc,byrow=TRUE); bmat <- matrix(b,nr,nc,byrow=TRUE); kmat <- matrix(k,nr,nc,byrow=FALSE); gmat <- g[row(M)-col(M)+nc]
-newe <- sum((log(M)-amat-bmat*kmat-gmat)^2)
+amat <- matrix(a,nr,nc,byrow=TRUE); bmat <- matrix(b,nr,nc,byrow=TRUE); kmat <- matrix(k,nr,nc,byrow=FALSE); gmat <- g[row(M)-col(M)+nc]; Emat <- E*exp(amat+bmat*kmat+gmat)
+a <- a+colSums(D-Emat)/colSums(Emat)
+amat <- matrix(a,nr,nc,byrow=TRUE); bmat <- matrix(b,nr,nc,byrow=TRUE); kmat <- matrix(k,nr,nc,byrow=FALSE); gmat <- g[row(M)-col(M)+nc]; Emat <- E*exp(amat+bmat*kmat+gmat)
+b <- b+colSums((D-Emat)*kmat)/colSums(Emat*kmat^2); b <- b/sum(b)
+amat <- matrix(a,nr,nc,byrow=TRUE); bmat <- matrix(b,nr,nc,byrow=TRUE); kmat <- matrix(k,nr,nc,byrow=FALSE); gmat <- g[row(M)-col(M)+nc]; Emat <- E*exp(amat+bmat*kmat+gmat)
+k <- k+rowSums((D-Emat)*bmat)/rowSums(Emat*bmat^2); k <- k-mean(k)
+amat <- matrix(a,nr,nc,byrow=TRUE); bmat <- matrix(b,nr,nc,byrow=TRUE); kmat <- matrix(k,nr,nc,byrow=FALSE); gmat <- g[row(M)-col(M)+nc]; Emat <- E*exp(amat+bmat*kmat+gmat)
+g <- g+as.numeric(tapply(as.vector(D-Emat),as.vector(row(M)-col(M)+nc),sum))/as.numeric(tapply(as.vector(Emat),as.vector(row(M)-col(M)+nc),sum)); g <- g-mean(g)
+amat <- matrix(a,nr,nc,byrow=TRUE); bmat <- matrix(b,nr,nc,byrow=TRUE); kmat <- matrix(k,nr,nc,byrow=FALSE); gmat <- g[row(M)-col(M)+nc]; Emat <- E*exp(amat+bmat*kmat+gmat)
+newe <- sum(D*log(D/Emat)-D+Emat)
 if (z>10&&olde-newe<tol&&olde>newe) { break }
 olde <- newe
 }
-res <- array(NA,c(nr,nc))
-for (i in 1:nr) { for (j in 1:nc) { res[i,j] <- log(M[i,j])-a[j]-b[j]*k[i]-g[i-j+nc] }}
-res <- res/sd(res)
+dis <- sum(2*(D*log(D/Emat)-D+Emat))/(nr*nc-length(a)-length(b)-length(k)-length(g)+3)
+res <- sign(D-Emat)*sqrt(2*(D*log(D/Emat)-D+Emat)/dis)
 kf <- suppressMessages(forecast(auto.arima(tsclean(k)),h=h)$mean)
 gf <- suppressMessages(forecast(auto.arima(tsclean(g),stationary=TRUE),h=h)$mean); gg <- c(g,gf)
 Mf <- array(NA,c(h,nc)); Mfs <- array(NA,c(h,nc))
@@ -91,26 +96,26 @@ if (jumpoff==1) { for (i in 1:h) { for (j in 1:nc) { Mf[i,j] <- exp(a[j]+b[j]*kf
 if (jumpoff==2) { for (i in 1:h) { for (j in 1:nc) { Mf[i,j] <- M[nr,j]*exp(b[j]*(kf[i]-k[nr])+gg[i-j+nc+nr]-g[nr-j+nc]) }}}
 for (i in 1:h) { Mfs[i,] <- fitted(MC(x=x,m=Mf[i,],curve=curve)) }
 invisible(structure(
-list(curve=curve,x=x,M=M,h=h,jumpoff=jumpoff,alpha=a,beta=b,kappa=k,gamma=g,standardresiduals=res,forecast=Mf,smoothforecast=Mfs),
-class="RHS"
+list(curve=curve,x=x,D=D,E=E,M=M,h=h,jumpoff=jumpoff,alpha=a,beta=b,kappa=k,gamma=g,standardresiduals=res,dispersion=dis,forecast=Mf,smoothforecast=Mfs),
+class="PRHS"
 ))
 }, error = function(e) { stop(paste0("model fitting and forecasting are unsuccessful - please make sure the data and age range are suitable for the model and curve\n",e$message),call.=FALSE) })
 }
 
 #' @export
-coef.RHS <- function(object,...) {
+coef.PRHS <- function(object,...) {
 list(alpha=object$alpha,beta=object$beta,kappa=object$kappa,gamma=object$gamma)
 }
 
 #' @export
-forecast.RHS <- function(object,which=1,...) {
+forecast.PRHS <- function(object,which=1,...) {
 if (length(which)!=1||!(which%in%c(1,2))) { stop("which must be 1 or 2") }
 if (which==1) { object$smoothforecast }
 else if (which==2) { object$forecast }
 }
 
 #' @export
-plot.RHS <- function(x,...) {
+plot.PRHS <- function(x,...) {
 old <- par(no.readonly=TRUE)
 on.exit(par(old))
 par(mfrow=c(3,2),mar=c(3.5,2.5,1.5,0.5),mgp=c(1.5,0.5,0))
@@ -128,39 +133,6 @@ legend("bottomright",legend=c("observed first data","observed last data",temp),p
 }
 
 #' @export
-residuals.RHS <- function(object,...) {
+residuals.PRHS <- function(object,...) {
 object$standardresiduals
-}
-
-#' @export
-simulate.RHS <- function(object,nsim=10,seed=123,...) {
-if (!is.numeric(nsim)||nsim!=floor(nsim)||nsim<1||!is.numeric(seed)||seed!=floor(seed)||seed<1) { stop("nsim and seed must be positive integers") }
-M <- object$M; h <- object$h; jumpoff <- object$jumpoff
-a <- object$alpha; b <- object$beta; k <- object$kappa; g <- object$gamma
-nr <- nrow(M); nc <- ncol(M)
-amat <- matrix(a,nr,nc,byrow=TRUE)
-bmat <- matrix(b,nr,nc,byrow=TRUE)
-kmat <- matrix(k,nr,nc,byrow=FALSE)
-gmat <- g[row(M)-col(M)+nc]
-res <- log(M)-amat-bmat*kmat-gmat
-s <- sd(res)
-f1 <- suppressMessages(auto.arima(tsclean(k)))
-f2 <- suppressMessages(auto.arima(tsclean(g),stationary=TRUE))
-Msim <- array(NA,c(h,nc,nsim))
-set.seed(seed)
-if (jumpoff==1) {
-for (z in 1:nsim) { 
-ksim <- simulate(f1,nsim=h)
-gsim <- simulate(f2,nsim=h)
-ggsim <- c(g,gsim)
-for (i in 1:h) { for (j in 1:nc) { Msim[i,j,z] <- exp(a[j]+b[j]*ksim[i]+ggsim[i-j+nc+nr]+rnorm(1,0,s)) }}
-}} 
-if (jumpoff==2) {
-for (z in 1:nsim) {
-ksim <- simulate(f1,nsim=h)
-gsim <- simulate(f2,nsim=h)
-ggsim <- c(g,gsim)
-for (i in 1:h) { for (j in 1:nc) { Msim[i,j,z] <- M[nr,j]*exp(b[j]*(ksim[i]-k[nr])+ggsim[i-j+nc+nr]-g[nr-j+nc]+rnorm(1,0,s)) }}
-}}
-list(Msim=Msim,sigma=s)
 }

@@ -24,7 +24,7 @@
 #' @importFrom grDevices colorRampPalette
 #'
 #' @return
-#' An object of class STARS with associated S3 methods coef, forecast, plot, residuals, and simulate (nsim for setting number of simulations; seed for initialising random number generator).
+#' An object of class STARS with associated S3 methods coef, forecast (which = 1 for smoothed (default); which = 2 for raw), plot, residuals, and simulate (nsim for setting number of simulations; seed for initialising random number generator).
 #'
 #' @references
 #' Li, H. and Lu, Y. (2017). Coherent forecasting of mortality rates: A sparse vector-autoregression approach. ASTIN Bulletin, 47(2), 563-600.
@@ -92,7 +92,7 @@ R[2,1]<- a[2]; R[2,2] <- 1-a[2]
 for (j in 3:nc) { R[j,j-2] <- b[j]; R[j,j-1] <- a[j]; R[j,j] <-1-a[j]-b[j] }
 res <- array(NA,c(nr-1,nc))
 for (i in 1:(nr-1)) { res[i,] <- log(M[i+1,])-u-R%*%log(M[i,]) }
-res <- (res-mean(res))/sd(res)
+res <- res/sd(res)
 Mf <- array(NA,c(h,nc)); Mfs <- array(NA,c(h,nc))
 Mf[1,] <- exp(u+R%*%log(M[nr,]))
 for (i in 2:h) { Mf[i,] <- exp(u+R%*%log(Mf[i-1,])) }
@@ -110,8 +110,10 @@ list(mu=object$mu,R=object$R)
 }
 
 #' @export
-forecast.STARS <- function(object,...) {
-object$smoothforecast
+forecast.STARS <- function(object,which=1,...) {
+if (length(which)!=1||!(which%in%c(1,2))) { stop("which must be 1 or 2") }
+if (which==1) { object$smoothforecast }
+else if (which==2) { object$forecast }
 }
 
 #' @export

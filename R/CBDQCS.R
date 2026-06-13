@@ -21,7 +21,7 @@
 #' @importFrom grDevices colorRampPalette
 #'
 #' @return
-#' An object of class CBDQCS with associated S3 methods coef, forecast, plot, residuals, and simulate (nsim for setting number of simulations; seed for initialising random number generator).
+#' An object of class CBDQCS with associated S3 methods coef, forecast (which = 1 for smoothed (default); which = 2 for raw), plot, residuals, and simulate (nsim for setting number of simulations; seed for initialising random number generator).
 #'
 #' @references
 #' Cairns, A.J.G., Blake, D., Dowd, K., Coughlan, G.D., Epstein, D., Ong, A., and Balevich, I. (2009). A quantitative comparison of stochastic mortality models using data from England and Wales and the United States. North American Actuarial Journal, 13(1), 1-35.
@@ -75,7 +75,7 @@ olde <- newe
 }
 res <- array(NA,c(nr,nc))
 for (i in 1:nr) { for (j in 1:nc) { res[i,j] <- log(M[i,j])-k1[i]-k2[i]*(x[j]-mean(x))-k3[i]*((x[j]-mean(x))^2-s2)-g[i-j+nc] }}
-res <- (res-mean(res))/sd(res)
+res <- res/sd(res)
 k1f <- suppressMessages(forecast(auto.arima(tsclean(k1)),h=h)$mean)
 k2f <- suppressMessages(forecast(auto.arima(tsclean(k2)),h=h)$mean)
 k3f <- suppressMessages(forecast(auto.arima(tsclean(k3)),h=h)$mean)
@@ -97,8 +97,10 @@ list(kappa1=object$kappa1,kappa2=object$kappa2,kappa3=object$kappa3,gamma=object
 }
 
 #' @export
-forecast.CBDQCS <- function(object,...) {
-object$smoothforecast
+forecast.CBDQCS <- function(object,which=1,...) {
+if (length(which)!=1||!(which%in%c(1,2))) { stop("which must be 1 or 2") }
+if (which==1) { object$smoothforecast }
+else if (which==2) { object$forecast }
 }
 
 #' @export
@@ -106,10 +108,10 @@ plot.CBDQCS <- function(x,...) {
 old <- par(no.readonly=TRUE)
 on.exit(par(old))
 par(mfrow=c(3,2),mar=c(3.5,2.5,1.5,0.5),mgp=c(1.5,0.5,0))
-plot(c(1:nrow(x$M)),x$kappa1,xlab="year",ylab="kappa1",pch=16,cex=0.5,bty="n")
-plot(c(1:nrow(x$M)),x$kappa2,xlab="year",ylab="kappa2",pch=16,cex=0.5,bty="n")
-plot(c(1:nrow(x$M)),x$kappa3,xlab="year",ylab="kappa3",pch=16,cex=0.5,bty="n")
-plot(c(1:(nrow(x$M)+ncol(x$M)-1)),x$gamma,xlab="cohort",ylab="gamma",pch=16,cex=0.5,bty="n")
+plot(c(1:nrow(x$M)),x$kappa1,xlab="year",ylab="kappa1",bty="n",type="l")
+plot(c(1:nrow(x$M)),x$kappa2,xlab="year",ylab="kappa2",bty="n",type="l")
+plot(c(1:nrow(x$M)),x$kappa3,xlab="year",ylab="kappa3",bty="n",type="l")
+plot(c(1:(nrow(x$M)+ncol(x$M)-1)),x$gamma,xlab="cohort",ylab="gamma",bty="n",type="l")
 colband <- colorRampPalette(c("black","grey","white"))
 image(x=x$x,y=c(1:nrow(x$M)),z=t(x$standardresiduals),col=colband(6),xlab="age",ylab="year",main="standardised residuals",cex.main=1,font.main=1)
 plot(x$x,log(x$M[1,]),xlab="age",ylab="log death rate",pch=16,cex=0.5,bty="n",ylim=c(min(log(x$M),log(x$smoothforecast)),max(log(x$M),log(x$smoothforecast))))

@@ -41,7 +41,7 @@
 ENI <- function(...,width=0.95,method=1,wm,nsim=10,seed=123) {
 fits <- list(...)
 n <- length(fits)
-if (n<2||n>7) { stop("number of models must be between 2 and 7") }
+if (n<3||n>7) { stop("number of models must be between 3 and 7") }
 if (missing(wm)) { wm <- rep(1/n,n) }
 allowed <- c("LCS","APCS","RHS","CBDS","CBDCS","CBDQCS","STARS")
 classes <- sapply(fits,function(x) class(x)[1])
@@ -93,7 +93,7 @@ z <- z+1 }
 upper <- upper-u/(n-1)
 lower <- lower-l/(n-1) }
 invisible(structure(
-list(x=x,M=fits[[1]]$M,wm=wm,h=h,upper=upper,lower=lower),
+list(x=x,M=fits[[1]]$M,width=width,method=method,wm=wm,h=h,upper=upper,lower=lower),
 class="ENI"
 ))
 }, error = function(e) { stop(paste0("ensemble is unsuccessful - please make sure the fitted model objects are valid\n",e$message),call.=FALSE) })
