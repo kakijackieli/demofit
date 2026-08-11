@@ -4,21 +4,14 @@
 \alias{CBDQCS}
 \title{CBD with curvature and cohort model}
 \usage{
-CBDQCS(
-  x,
-  M,
-  curve = c("gompertz", "makeham", "perks", "weibull", "beard", "martinelle", "thatcher",
-    "gompertz2", "makeham2", "perks2", "weibull2", "beard2", "martinelle2", "thatcher2"),
-  h = 10,
-  jumpoff = 1
-)
+CBDQCS(x, M, curve = NULL, h = 10, jumpoff = 1)
 }
 \arguments{
 \item{x}{vector of ages.}
 
 \item{M}{matrix of mortality rates (rows as years and columns as ages).}
 
-\item{curve}{name of mortality curve for smoothing forecasted mortality rates (including gompertz, makeham, perks, weibull, beard, martinelle, thatcher, gompertz2, makeham2, perks2, weibull2, beard2, martinelle2, thatcher2, where first 7 curves' parameters are unconstrained and last 7 curves' parameters are generally restricted to be positive).}
+\item{curve}{name of mortality curve for smoothing forecasted mortality rates (including gompertz, makeham, perks, weibull, beard, martinelle, thatcher, gompertz2, makeham2, perks2, weibull2, beard2, martinelle2, thatcher2, where first 7 curves' parameters are unconstrained and last 7 curves' parameters are generally restricted to be positive) (optional; if missing, no smoothing is performed).}
 
 \item{h}{forecast horizon (default = 10).}
 

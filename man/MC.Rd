@@ -4,16 +4,7 @@
 \alias{MC}
 \title{Mortality curve fitting}
 \usage{
-MC(
-  x,
-  m,
-  curve = c("gompertz", "makeham", "oppermann", "thiele", "wittsteinbumsted", "perks",
-    "weibull", "vandermaen", "beard", "heligmanpollard", "rogersplanck", "siler",
-    "martinelle", "thatcher", "gompertz2", "makeham2", "oppermann2", "thiele2",
-    "wittsteinbumsted2", "perks2", "weibull2", "vandermaen2", "beard2",
-    "heligmanpollard2", "rogersplanck2", "siler2", "martinelle2", "thatcher2"),
-  w = rep(1, length(x))
-)
+MC(x, m, curve = .curves, w = rep(1, length(x)))
 }
 \arguments{
 \item{x}{vector of ages.}

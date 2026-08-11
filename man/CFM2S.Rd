@@ -4,18 +4,7 @@
 \alias{CFM2S}
 \title{Common factor model with global age pattern}
 \usage{
-CFM2S(
-  x,
-  M1,
-  M2,
-  curve = c("gompertz", "makeham", "oppermann", "thiele", "wittsteinbumsted", "perks",
-    "weibull", "vandermaen", "beard", "heligmanpollard", "rogersplanck", "siler",
-    "martinelle", "thatcher", "gompertz2", "makeham2", "oppermann2", "thiele2",
-    "wittsteinbumsted2", "perks2", "weibull2", "vandermaen2", "beard2",
-    "heligmanpollard2", "rogersplanck2", "siler2", "martinelle2", "thatcher2"),
-  h = 10,
-  jumpoff = 1
-)
+CFM2S(x, M1, M2, curve = NULL, h = 10, jumpoff = 1)
 }
 \arguments{
 \item{x}{vector of ages.}
@@ -24,7 +13,7 @@ CFM2S(
 
 \item{M2}{matrix of mortality rates of population 2 (rows as years and columns as ages).}
 
-\item{curve}{name of mortality curve for smoothing forecasted mortality rates (including gompertz, makeham, oppermann, thiele, wittsteinbumsted, perks, weibull, vandermaen, beard, heligmanpollard, rogersplanck, siler, martinelle, thatcher, gompertz2, makeham2, oppermann2, thiele2, wittsteinbumsted2, perks2, weibull2, vandermaen2, beard2, heligmanpollard2, rogersplanck2, siler2, martinelle2, thatcher2, where first 14 curves' parameters are unconstrained and last 14 curves' parameters are generally restricted to be positive).}
+\item{curve}{name of mortality curve for smoothing forecasted mortality rates (including gompertz, makeham, oppermann, thiele, wittsteinbumsted, perks, weibull, vandermaen, beard, heligmanpollard, rogersplanck, siler, martinelle, thatcher, gompertz2, makeham2, oppermann2, thiele2, wittsteinbumsted2, perks2, weibull2, vandermaen2, beard2, heligmanpollard2, rogersplanck2, siler2, martinelle2, thatcher2, where first 14 curves' parameters are unconstrained and last 14 curves' parameters are generally restricted to be positive) (optional; if missing, no smoothing is performed).}
 
 \item{h}{forecast horizon (default = 10).}
 

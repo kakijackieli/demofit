@@ -8,11 +8,7 @@ FCS(
   x,
   M,
   model = c("LC", "RH", "APC", "CBD", "CBDC", "CBDQC", "STAR"),
-  curve = c("gompertz", "makeham", "oppermann", "thiele", "wittsteinbumsted", "perks",
-    "weibull", "vandermaen", "beard", "heligmanpollard", "rogersplanck", "siler",
-    "martinelle", "thatcher", "gompertz2", "makeham2", "oppermann2", "thiele2",
-    "wittsteinbumsted2", "perks2", "weibull2", "vandermaen2", "beard2",
-    "heligmanpollard2", "rogersplanck2", "siler2", "martinelle2", "thatcher2"),
+  curve = NULL,
   h = 10,
   jumpoff = 1
 )
@@ -24,7 +20,7 @@ FCS(
 
 \item{model}{name of stochastic mortality model (including LC, RH, APC, CBD, CBDC, CBDQC, and STAR).}
 
-\item{curve}{name of mortality curve for smoothing forecasted mortality rates (including gompertz, makeham, oppermann, thiele, wittsteinbumsted, perks, weibull, vandermaen, beard, heligmanpollard, rogersplanck, siler, martinelle, thatcher, gompertz2, makeham2, oppermann2, thiele2, wittsteinbumsted2, perks2, weibull2, vandermaen2, beard2, heligmanpollard2, rogersplanck2, siler2, martinelle2, thatcher2, where first 14 curves' parameters are unconstrained and last 14 curves' parameters are generally restricted to be positive).}
+\item{curve}{name of mortality curve for smoothing forecasted mortality rates (including gompertz, makeham, oppermann, thiele, wittsteinbumsted, perks, weibull, vandermaen, beard, heligmanpollard, rogersplanck, siler, martinelle, thatcher, gompertz2, makeham2, oppermann2, thiele2, wittsteinbumsted2, perks2, weibull2, vandermaen2, beard2, heligmanpollard2, rogersplanck2, siler2, martinelle2, thatcher2, where first 14 curves' parameters are unconstrained and last 14 curves' parameters are generally restricted to be positive) (optional; if missing, no smoothing is performed).}
 
 \item{h}{forecast horizon (default = 10).}
 
