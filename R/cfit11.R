@@ -3,14 +3,7 @@
 #' @importFrom graphics lines legend
 
 cfit11 <- function(x,m,w) {
-if (!is.numeric(x)||!is.numeric(m)) { stop("x and m must be numeric") }
-if (!is.vector(x)||!is.vector(m)) { stop("x and m must be vectors") }
-if (length(x)!=length(m)) { stop("x and m must have the same length") }
-if (is.unsorted(x,strictly=TRUE)) { stop("x must be in ascending order") }
-if (any(x<0)) { stop("x must be non-negative") }
-if (any(m<=0)) { stop("m must be positive") }
-if (length(w)!=length(x)) { stop("w must have the same length as x and m") }
-if (any(w<0)) { stop("w must be non-negative") }
+.checkinput(x,m,w)
 if ((min(x)>5)||(max(x)<60)) { stop("youngest age must be 5 or lower and oldest age must be 60 or higher") }
 f1 <- function(p) { sum(w[x<=9]*(log(m[x<=9])-log(p[1]/exp(p[2]*x[x<=9])))^2) }
 suppressWarnings(result1 <- nlminb(c(0.01,1),f1,lower=c(0,0),upper=c(Inf,Inf)))
@@ -26,6 +19,7 @@ suppressWarnings(resultb <- nls.lm(param,h,lower=rep(0,9),upper=rep(Inf,9)))
 oa = ifelse (is.finite(resulta$objective),resulta$objective,Inf)
 ob = ifelse (is.finite(sum(resultb$fvec^2)),sum(resultb$fvec^2),Inf)
 if (all(!is.finite(c(oa,ob)))) stop("all optimisation attempts are unsuccessful")
+diagnostics = list(port=resulta,levenberg=resultb)
 ind = which.min(c(oa,ob))
 if (ind==1) {
 A0 <- resulta$par[1]
@@ -50,7 +44,7 @@ U <- resultb$par[9]
 }
 fitted <- A0+A1/exp(A*x)+A2/exp(B*(x-U)+1/exp(C*(x-U)))+A3*exp(D*x)
 structure(
-list(curve="Rogers Planck",x=x,m=m,w=w,A0=A0,A1=A1,A2=A2,A3=A3,A=A,B=B,C=C,D=D,U=U,fitted=fitted),
+list(curve="Rogers Planck",x=x,m=m,w=w,A0=A0,A1=A1,A2=A2,A3=A3,A=A,B=B,C=C,D=D,U=U,fitted=fitted,diagnostics=diagnostics),
 class="cFit11"
 )
 }
@@ -61,9 +55,7 @@ c(A0=object$A0,A1=object$A1,A2=object$A2,A3=object$A3,A=object$A,B=object$B,C=ob
 }
 
 #' @export
-fitted.cFit11 <- function(object,...) {
-object$fitted
-}
+fitted.cFit11 <- .fittedFit
 
 #' @export
 predict.cFit11 <- function(object,newdata,...) {
@@ -71,18 +63,10 @@ object$A0+object$A1/exp(object$A*newdata)+object$A2/exp(object$B*(newdata-object
 }
 
 #' @export
-plot.cFit11 <- function(x,...) {
-plot(x$x,log(x$m),xlab="age",ylab="log death rate",pch=16,cex=0.5,bty="n")
-lines(x$x,log(x$fitted))
-legend("bottomright",legend=c("observed","fitted"),pch=c(16,NA),lty=c(NA,1),pt.cex=0.5,cex=0.8,bty="n")
-}
+plot.cFit11 <- .plotFit
 
 #' @export
-deviance.cFit11 <- function(object,...) {
-sum(object$w*(log(object$m)-log(object$fitted))^2)
-}
+deviance.cFit11 <- .devianceFit
 
 #' @export
-residuals.cFit11 <- function(object,...) {
-log(object$m)-log(object$fitted)
-}
+residuals.cFit11 <- .residualsFit

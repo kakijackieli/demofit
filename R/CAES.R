@@ -5,7 +5,7 @@
 #' @param x vector of ages.
 #' @param M1 matrix of mortality rates of population 1 (rows as years and columns as ages).
 #' @param M2 matrix of mortality rates of population 2 (rows as years and columns as ages).
-#' @param curve name of mortality curve for smoothing forecasted mortality rates (including gompertz, makeham, oppermann, thiele, wittsteinbumsted, perks, weibull, vandermaen, beard, heligmanpollard, rogersplanck, siler, martinelle, thatcher, gompertz2, makeham2, oppermann2, thiele2, wittsteinbumsted2, perks2, weibull2, vandermaen2, beard2, heligmanpollard2, rogersplanck2, siler2, martinelle2, thatcher2, where first 14 curves' parameters are unconstrained and last 14 curves' parameters are generally restricted to be positive).
+#' @param curve name of mortality curve for smoothing forecasted mortality rates (including gompertz, makeham, oppermann, thiele, wittsteinbumsted, perks, weibull, vandermaen, beard, heligmanpollard, rogersplanck, siler, martinelle, thatcher, gompertz2, makeham2, oppermann2, thiele2, wittsteinbumsted2, perks2, weibull2, vandermaen2, beard2, heligmanpollard2, rogersplanck2, siler2, martinelle2, thatcher2, where first 14 curves' parameters are unconstrained and last 14 curves' parameters are generally restricted to be positive) (optional; if missing, no smoothing is performed).
 #' @param h forecast horizon (default = 10).
 #' @param jumpoff if 1, forecasts are based on estimated parameters only; if 2, forecasts are anchored to observed mortality rates in final year (default = 1). 
 #'
@@ -54,19 +54,9 @@
 #' residuals(fit)
 #'
 #' @export
-CAES <- function(x,M1,M2,curve=c("gompertz","makeham","oppermann","thiele","wittsteinbumsted","perks","weibull","vandermaen","beard","heligmanpollard","rogersplanck","siler","martinelle","thatcher","gompertz2","makeham2","oppermann2","thiele2","wittsteinbumsted2","perks2","weibull2","vandermaen2","beard2","heligmanpollard2","rogersplanck2","siler2","martinelle2","thatcher2"),h=10,jumpoff=1) {
-if (!is.numeric(x)||!is.numeric(M1)||!is.numeric(M2)) { stop("x and M1 and M2 must be numeric") }
-if (!is.vector(x)) { stop("x must be a vector") }
-if (!is.matrix(M1)||!is.matrix(M2)) stop("M1 and M2 must be a matrix with its rows as years and columns as ages")
-if (length(x)!=ncol(M1)||length(x)!=ncol(M2)) stop("the number of ages must match the number of columns of M1 and M2")
-if (is.unsorted(x,strictly=TRUE)) { stop("x must be in ascending order") }
-if (any(x<0)) { stop("x must be non-negative") }
-if (any(M1<=0)||any(M2<=0)) { stop("all M1 and M2 values must be positive") }
-if (nrow(M1)<20) stop("it requires at least 20 years of data for this forecast")
-if (!is.numeric(h)||!is.numeric(jumpoff)) { stop("h and jumpoff must be numeric") }
-if (h<1) { stop("h must be at least 1") }
-if (jumpoff!=1&&jumpoff!=2) { stop("jump-off must be either 1 or 2") }
-curve <- tryCatch(match.arg(curve),error = function(e) { stop("invalid curve choice") })
+CAES <- function(x,M1,M2,curve=NULL,h=10,jumpoff=1) {
+.checkinput3(x,M1,M2,h,jumpoff)
+if (!is.null(curve)) { curve <- tryCatch(match.arg(curve,choices=.curves),error = function(e) { stop("invalid curve choice") }) }
 tryCatch({
 nr <- nrow(M1); nc <- ncol(M1)
 a1 <- numeric(); for (j in 1:nc) { a1[j] <- mean(log(M1[,j])) }
@@ -106,8 +96,12 @@ if (jumpoff==1) { for (i in 1:h) { for (j in 1:nc) { M1f[i,j] <- exp(a1[j]+b[j]*
 if (jumpoff==1) { for (i in 1:h) { for (j in 1:nc) { M2f[i,j] <- exp(a2[j]+b[j]*k2f[i]) }}}
 if (jumpoff==2) { for (i in 1:h) { for (j in 1:nc) { M1f[i,j] <- M1[nr,j]*exp(b[j]*(k1f[i]-k1[nr])) }}}
 if (jumpoff==2) { for (i in 1:h) { for (j in 1:nc) { M2f[i,j] <- M2[nr,j]*exp(b[j]*(k2f[i]-k2[nr])) }}}
+if (!is.null(curve)) {
 for (i in 1:h) { M1fs[i,] <- fitted(MC(x=x,m=M1f[i,],curve=curve)) }
 for (i in 1:h) { M2fs[i,] <- fitted(MC(x=x,m=M2f[i,],curve=curve)) }
+} else {
+M1fs <- M1f; M2fs <- M2f
+}
 invisible(structure(
 list(curve=curve,x=x,M1=M1,M2=M2,h=h,jumpoff=jumpoff,alpha1=a1,alpha2=a2,beta=b,kappa1=k1,kappa2=k2,standardresiduals1=res1,standardresiduals2=res2,forecast1=M1f,forecast2=M2f,smoothforecast1=M1fs,smoothforecast2=M2fs),
 class="CAES"
@@ -121,11 +115,7 @@ list(alpha1=object$alpha1,alpha2=object$alpha2,beta=object$beta,kappa1=object$ka
 }
 
 #' @export
-forecast.CAES <- function(object,which=1,...) {
-if (length(which)!=1||!(which%in%c(1,2))) { stop("which must be 1 or 2") }
-if (which==1) { list(smoothforecast1=object$smoothforecast1,smoothforecast2=object$smoothforecast2) }
-else if (which==2) { list(forecast1=object$forecast1,forecast2=object$forecast2) }
-}
+forecast.CAES <- function(object,which=1,...) .forecastCModel(object,which,...)
 
 #' @export
 plot.CAES <- function(x,which=1,...) {
@@ -157,6 +147,4 @@ legend("bottomright",legend=c("observed first data","observed last data",temp),p
 }}
 
 #' @export
-residuals.CAES <- function(object,...) {
-list(standardresiduals1=object$standardresiduals1,standardresiduals2=object$standardresiduals2)
-}
+residuals.CAES <- function(object,...) .residualsCModel(object,...)

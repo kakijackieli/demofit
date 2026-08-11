@@ -5,7 +5,7 @@
 #' @param x vector of ages.
 #' @param D matrix of death counts (rows as years and columns as ages).
 #' @param E matrix of mid-year exposures (rows as years and columns as ages).
-#' @param curve name of mortality curve for smoothing forecasted mortality rates (including gompertz, makeham, oppermann, thiele, wittsteinbumsted, perks, weibull, vandermaen, beard, heligmanpollard, rogersplanck, siler, martinelle, thatcher, gompertz2, makeham2, oppermann2, thiele2, wittsteinbumsted2, perks2, weibull2, vandermaen2, beard2, heligmanpollard2, rogersplanck2, siler2, martinelle2, thatcher2, where first 14 curves' parameters are unconstrained and last 14 curves' parameters are generally restricted to be positive).
+#' @param curve name of mortality curve for smoothing forecasted mortality rates (including gompertz, makeham, oppermann, thiele, wittsteinbumsted, perks, weibull, vandermaen, beard, heligmanpollard, rogersplanck, siler, martinelle, thatcher, gompertz2, makeham2, oppermann2, thiele2, wittsteinbumsted2, perks2, weibull2, vandermaen2, beard2, heligmanpollard2, rogersplanck2, siler2, martinelle2, thatcher2, where first 14 curves' parameters are unconstrained and last 14 curves' parameters are generally restricted to be positive) (optional; if missing, no smoothing is performed).
 #' @param h forecast horizon (default = 10).
 #' @param jumpoff if 1, forecasts are based on estimated parameters only; if 2, forecasts are anchored to observed mortality rates in final year (default = 1). 
 #'
@@ -51,19 +51,9 @@
 #' residuals(fit)
 #'
 #' @export
-PRHS <- function(x,D,E,curve=c("gompertz","makeham","oppermann","thiele","wittsteinbumsted","perks","weibull","vandermaen","beard","heligmanpollard","rogersplanck","siler","martinelle","thatcher","gompertz2","makeham2","oppermann2","thiele2","wittsteinbumsted2","perks2","weibull2","vandermaen2","beard2","heligmanpollard2","rogersplanck2","siler2","martinelle2","thatcher2"),h=10,jumpoff=1) {
-if (!is.numeric(x)||!is.numeric(D)||!is.numeric(E)) { stop("x and D and E must be numeric") }
-if (!is.vector(x)) { stop("x must be a vector") }
-if (!is.matrix(D)||!is.matrix(E)||nrow(D)!=nrow(E)) stop("D and E must be a matrix with its rows as years and columns as ages")
-if (length(x)!=ncol(D)||length(x)!=ncol(E)) stop("the number of ages must match the number of columns of D and E")
-if (is.unsorted(x,strictly=TRUE)) { stop("x must be in ascending order") }
-if (any(x<0)) { stop("x must be non-negative") }
-if (any(D<=0)||any(E<=0)) { stop("all D and E values must be positive") }
-if (nrow(D)<20) stop("it requires at least 20 years of data for this forecast")
-if (!is.numeric(h)||!is.numeric(jumpoff)) { stop("h and jumpoff must be numeric") }
-if (h<1) { stop("h must be at least 1") }
-if (jumpoff!=1&&jumpoff!=2) { stop("jump-off must be either 1 or 2") }
-curve <- tryCatch(match.arg(curve),error = function(e) { stop("invalid curve choice") })
+PRHS <- function(x,D,E,curve=NULL,h=10,jumpoff=1) {
+.checkPN(x,D,E,h,jumpoff)
+if (!is.null(curve)) { curve <- tryCatch(match.arg(curve,choices=.curves),error = function(e) { stop("invalid curve choice") }) }
 tryCatch({
 M <- D/E
 nr <- nrow(M); nc <- ncol(M)
@@ -94,7 +84,11 @@ gf <- suppressMessages(forecast(auto.arima(tsclean(g),stationary=TRUE),h=h)$mean
 Mf <- array(NA,c(h,nc)); Mfs <- array(NA,c(h,nc))
 if (jumpoff==1) { for (i in 1:h) { for (j in 1:nc) { Mf[i,j] <- exp(a[j]+b[j]*kf[i]+gg[i-j+nc+nr]) }}}
 if (jumpoff==2) { for (i in 1:h) { for (j in 1:nc) { Mf[i,j] <- M[nr,j]*exp(b[j]*(kf[i]-k[nr])+gg[i-j+nc+nr]-g[nr-j+nc]) }}}
+if (!is.null(curve)) {
 for (i in 1:h) { Mfs[i,] <- fitted(MC(x=x,m=Mf[i,],curve=curve)) }
+} else {
+Mfs <- Mf
+}
 invisible(structure(
 list(curve=curve,x=x,D=D,E=E,M=M,h=h,jumpoff=jumpoff,alpha=a,beta=b,kappa=k,gamma=g,standardresiduals=res,dispersion=dis,forecast=Mf,smoothforecast=Mfs),
 class="PRHS"
@@ -108,11 +102,7 @@ list(alpha=object$alpha,beta=object$beta,kappa=object$kappa,gamma=object$gamma)
 }
 
 #' @export
-forecast.PRHS <- function(object,which=1,...) {
-if (length(which)!=1||!(which%in%c(1,2))) { stop("which must be 1 or 2") }
-if (which==1) { object$smoothforecast }
-else if (which==2) { object$forecast }
-}
+forecast.PRHS <- function(object,which=1,...) .forecastModel(object,which,...)
 
 #' @export
 plot.PRHS <- function(x,...) {
@@ -133,6 +123,4 @@ legend("bottomright",legend=c("observed first data","observed last data",temp),p
 }
 
 #' @export
-residuals.PRHS <- function(object,...) {
-object$standardresiduals
-}
+residuals.PRHS <- function(object,...) .residualsModel(object,...)

@@ -5,7 +5,7 @@
 #' @param x vector of ages.
 #' @param M matrix of mortality rates (rows as years and columns as ages).
 #' @param wm vector of weights for LC, RH, APC, M5, M6, M7, and STAR models (default = 1/7).
-#' @param curve name of mortality curve for smoothing ensemble mortality rates (including gompertz, makeham, oppermann, thiele, wittsteinbumsted, perks, weibull, vandermaen, beard, heligmanpollard, rogersplanck, siler, martinelle, thatcher, gompertz2, makeham2, oppermann2, thiele2, wittsteinbumsted2, perks2, weibull2, vandermaen2, beard2, heligmanpollard2, rogersplanck2, siler2, martinelle2, thatcher2, where first 14 curves' parameters are unconstrained and last 14 curves' parameters are generally restricted to be positive).
+#' @param curve name of mortality curve for smoothing ensemble mortality rates (including gompertz, makeham, oppermann, thiele, wittsteinbumsted, perks, weibull, vandermaen, beard, heligmanpollard, rogersplanck, siler, martinelle, thatcher, gompertz2, makeham2, oppermann2, thiele2, wittsteinbumsted2, perks2, weibull2, vandermaen2, beard2, heligmanpollard2, rogersplanck2, siler2, martinelle2, thatcher2, where first 14 curves' parameters are unconstrained and last 14 curves' parameters are generally restricted to be positive) (optional; if missing, no smoothing is performed).
 #' @param h forecast horizon (default = 10).
 #' @param jumpoff if 1, forecasts are based on estimated parameters only; if 2, forecasts are anchored to observed mortality rates in final year (default = 1).
 #'
@@ -32,11 +32,11 @@
 #' plot(fit)
 #'
 #' @export
-ENS <- function(x,M,wm=rep(1/7,7),curve=c("gompertz","makeham","oppermann","thiele","wittsteinbumsted","perks","weibull","vandermaen","beard","heligmanpollard","rogersplanck","siler","martinelle","thatcher","gompertz2","makeham2","oppermann2","thiele2","wittsteinbumsted2","perks2","weibull2","vandermaen2","beard2","heligmanpollard2","rogersplanck2","siler2","martinelle2","thatcher2"),h=10,jumpoff=1) {
+ENS <- function(x,M,wm=rep(1/7,7),curve=NULL,h=10,jumpoff=1) {
 if (length(wm)!=7) { stop("wm must have a length of 7") }
 if (any(wm<0)) { stop("wm must be non-negative") }
 if (abs(sum(wm)-1)>1e-8) { stop("wm must sum to 1") }
-curve <- tryCatch(match.arg(curve),error = function(e) { stop("invalid curve choice") })
+if (!is.null(curve)) { curve <- tryCatch(match.arg(curve,choices=.curves),error = function(e) { stop("invalid curve choice") }) }
 tryCatch({
 fit1 <- LCS(x,M,curve,h,jumpoff)
 fit2 <- RHS(x,M,curve,h,jumpoff)
@@ -47,7 +47,11 @@ fit6 <- CBDQCS(x,M,curve,h,jumpoff)
 fit7 <- STARS(x,M,curve,h)
 Mf <- wm[1]*fit1$forecast+wm[2]*fit2$forecast+wm[3]*fit3$forecast+wm[4]*fit4$forecast+wm[5]*fit5$forecast+wm[6]*fit6$forecast+wm[7]*fit7$forecast
 Mfs <- array(NA,c(h,ncol(M)))
+if (!is.null(curve)) {
 for (i in 1:h) { Mfs[i,] <- fitted(MC(x=x,m=Mf[i,],curve=curve)) }
+} else {
+Mfs <- Mf
+}
 invisible(structure(
 list(curve=curve,x=x,M=M,wm=wm,h=h,jumpoff=jumpoff,forecast=Mf,smoothforecast=Mfs),
 class="ENS"
@@ -56,11 +60,7 @@ class="ENS"
 }
 
 #' @export
-forecast.ENS <- function(object,which=1,...) {
-if (length(which)!=1||!(which%in%c(1,2))) { stop("which must be 1 or 2") }
-if (which==1) { object$smoothforecast }
-else if (which==2) { object$forecast }
-}
+forecast.ENS <- function(object,which=1,...) .forecastModel(object,which,...)
 
 #' @export
 plot.ENS <- function(x,...) {

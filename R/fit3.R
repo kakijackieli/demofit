@@ -3,14 +3,7 @@
 #' @importFrom graphics lines legend
 
 fit3 <- function(x,m,w) {
-if (!is.numeric(x)||!is.numeric(m)) { stop("x and m must be numeric") }
-if (!is.vector(x)||!is.vector(m)) { stop("x and m must be vectors") }
-if (length(x)!=length(m)) { stop("x and m must have the same length") }
-if (is.unsorted(x,strictly=TRUE)) { stop("x must be in ascending order") }
-if (any(x<0)) { stop("x must be non-negative") }
-if (any(m<=0)) { stop("m must be positive") }
-if (length(w)!=length(x)) { stop("w must have the same length as x and m") }
-if (any(w<0)) { stop("w must be non-negative") }
+.checkinput(x,m,w)
 f <- function(p) { sum(w *(log(m)-log(p[1]/sqrt(x+1)-p[2]+p[3]*sqrt(x+1)))^2) }
 suppressWarnings(resulta <- nlminb(c(0.01,0.001,0.001),f))
 suppressWarnings(resultb <- optim(c(0.01,0.001,0.001),f,method="Nelder-Mead"))
@@ -20,6 +13,7 @@ oa = ifelse (is.finite(resulta$objective),resulta$objective,Inf)
 ob = ifelse (is.finite(resultb$value),resultb$value,Inf)
 oc = ifelse (is.finite(sum(resultc$fvec^2)),sum(resultc$fvec^2),Inf)
 if (all(!is.finite(c(oa,ob,oc)))) stop("all optimisation attempts are unsuccessful")
+diagnostics = list(port=resulta,nelder=resultb,levenberg=resultc)
 ind = which.min(c(oa,ob,oc))
 if (ind==1) {
 A <- resulta$par[1]
@@ -36,7 +30,7 @@ C <- resultc$par[3]
 }
 fitted <- A/sqrt(x+1)-B+C*sqrt(x+1)
 structure(
-list(curve="Oppermann",x=x,m=m,w=w,A=A,B=B,C=C,fitted=fitted),
+list(curve="Oppermann",x=x,m=m,w=w,A=A,B=B,C=C,fitted=fitted,diagnostics=diagnostics),
 class="Fit3"
 )
 }
@@ -47,9 +41,7 @@ c(A=object$A,B=-object$B,C=object$C)
 }
 
 #' @export
-fitted.Fit3 <- function(object,...) {
-object$fitted
-}
+fitted.Fit3 <- .fittedFit
 
 #' @export
 predict.Fit3 <- function(object,newdata,...) {
@@ -57,18 +49,10 @@ object$A/sqrt(newdata+1)-object$B+object$C*sqrt(newdata+1)
 }
 
 #' @export
-plot.Fit3 <- function(x,...) {
-plot(x$x,log(x$m),xlab="age",ylab="log death rate",pch=16,cex=0.5,bty="n")
-lines(x$x,log(x$fitted))
-legend("bottomright",legend=c("observed","fitted"),pch=c(16,NA),lty=c(NA,1),pt.cex=0.5,cex=0.8,bty="n")
-}
+plot.Fit3 <- .plotFit
 
 #' @export
-deviance.Fit3 <- function(object,...) {
-sum(object$w*(log(object$m)-log(object$fitted))^2)
-}
+deviance.Fit3 <- .devianceFit
 
 #' @export
-residuals.Fit3 <- function(object,...) {
-log(object$m)-log(object$fitted)
-}
+residuals.Fit3 <- .residualsFit

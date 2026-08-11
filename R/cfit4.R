@@ -3,14 +3,7 @@
 #' @importFrom graphics lines legend
 
 cfit4 <- function(x,m,w) {
-if (!is.numeric(x)||!is.numeric(m)) { stop("x and m must be numeric") }
-if (!is.vector(x)||!is.vector(m)) { stop("x and m must be vectors") }
-if (length(x)!=length(m)) { stop("x and m must have the same length") }
-if (is.unsorted(x,strictly=TRUE)) { stop("x must be in ascending order") }
-if (any(x<0)) { stop("x must be non-negative") }
-if (any(m<=0)) { stop("m must be positive") }
-if (length(w)!=length(x)) { stop("w must have the same length as x and m") }
-if (any(w<0)) { stop("w must be non-negative") }
+.checkinput(x,m,w)
 if ((min(x)>5)||(max(x)<60)) { stop("youngest age must be 5 or lower and oldest age must be 60 or higher") }
 f1 <- function(p) { sum(w[x<=9]*(log(m[x<=9])-log(p[1]/exp(p[2]*x[x<=9])))^2) }
 suppressWarnings(result1 <- nlminb(c(0.01,1),f1,lower=c(0,0),upper=c(Inf,Inf)))
@@ -25,6 +18,7 @@ suppressWarnings(resultb <- nls.lm(c(result1$par,result2$par,result3$par),h,lowe
 oa = ifelse (is.finite(resulta$objective),resulta$objective,Inf)
 ob = ifelse (is.finite(sum(resultb$fvec^2)),sum(resultb$fvec^2),Inf)
 if (all(!is.finite(c(oa,ob)))) stop("all optimisation attempts are unsuccessful")
+diagnostics = list(port=resulta,levenberg=resultb)
 ind = which.min(c(oa,ob))
 if (ind==1) {
 A1 <- resulta$par[1]
@@ -45,7 +39,7 @@ B3 <- resultb$par[7]
 }
 fitted <- A1/exp(B1*x)+A2/exp(0.5*B2*(x-C)^2)+A3*exp(B3*x)
 structure(
-list(curve="Thiele",x=x,m=m,w=w,A1=A1,B1=B1,A2=A2,B2=B2,C=C,A3=A3,B3=B3,fitted=fitted),
+list(curve="Thiele",x=x,m=m,w=w,A1=A1,B1=B1,A2=A2,B2=B2,C=C,A3=A3,B3=B3,fitted=fitted,diagnostics=diagnostics),
 class="cFit4"
 )
 }
@@ -56,9 +50,7 @@ c(A1=object$A1,B1=object$B1,A2=object$A2,B2=object$B2,C=object$C,A3=object$A3,B3
 }
 
 #' @export
-fitted.cFit4 <- function(object,...) {
-object$fitted
-}
+fitted.cFit4 <- .fittedFit
 
 #' @export
 predict.cFit4 <- function(object,newdata,...) {
@@ -66,18 +58,10 @@ object$A1/exp(object$B1*newdata)+object$A2/exp(0.5*object$B2*(newdata-object$C)^
 }
 
 #' @export
-plot.cFit4 <- function(x,...) {
-plot(x$x,log(x$m),xlab="age",ylab="log death rate",pch=16,cex=0.5,bty="n")
-lines(x$x,log(x$fitted))
-legend("bottomright",legend=c("observed","fitted"),pch=c(16,NA),lty=c(NA,1),pt.cex=0.5,cex=0.8,bty="n")
-}
+plot.cFit4 <- .plotFit
 
 #' @export
-deviance.cFit4 <- function(object,...) {
-sum(object$w*(log(object$m)-log(object$fitted))^2)
-}
+deviance.cFit4 <- .devianceFit
 
 #' @export
-residuals.cFit4 <- function(object,...) {
-log(object$m)-log(object$fitted)
-}
+residuals.cFit4 <- .residualsFit
