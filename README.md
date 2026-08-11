@@ -16,8 +16,8 @@ demofit is an R package for fitting parametric mortality curves and forecasting 
 ## Installation
 
 ```r
+install.packages("demofit")
 remotes::install\_github("jackieli/demofit")
-
 ```
 
 ## Documentation
