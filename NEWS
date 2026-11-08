@@ -1,3 +1,9 @@
+0.1.6
+-----
+- Added SEN() for analytical sensitivities of Lee-Carter parameters, mortality forecasts, and actuarial values
+- Enhanced mortality curve fitting algorithms
+- Expanded vignette
+
 0.1.5
 -----
 - Added mortalitymatrix() for data format conversion

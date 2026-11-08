@@ -10,6 +10,7 @@ demofit is an R package for fitting parametric mortality curves and forecasting 
 - Multiple optimisation methods for robust parameter estimation of mortality curves
 - Ensemble point and interval mortality forecasting
 - Multi-population mortality forecasting models (CFM, CAE)
+- Analytical sensitivities of Lee-Carter parameters, mortality forecasts, and actuarial values
 - Unified interfaces through MC(), FCS(), and PFCS()
 - S3 methods for obtaining fitting and forecasting results
 
