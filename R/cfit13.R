@@ -9,7 +9,7 @@ f <- function(p) { sum(w *(log(m)-log((p[1]+p[2]*exp(p[3]*x))/(1+p[4]*exp(p[3]*x
 suppressWarnings(resulta <- nlminb(c(0.001,0.00001,0.1,0.00001,0.0001),f,lower=c(0,0,0,0,0),upper=c(Inf,Inf,Inf,Inf,Inf)))
 h <- function(p) { sqrt(w)*(log(m)-log((p[1]+p[2]*exp(p[3]*x))/(1+p[4]*exp(p[3]*x))+p[5]*exp(p[3]*x))) }
 suppressWarnings(resultb <- nls.lm(c(0.001,0.00001,0.1,0.00001,0.0001),h,lower=c(0,0,0,0,0),upper=c(Inf,Inf,Inf,Inf,Inf)))
-resultc <- MortalityLaw(x=x,mx=m,law="martinelle")
+suppressWarnings(resultc <- MortalityLaw(x=x,mx=m,law="martinelle"))
 error <- f(as.numeric(c(coef(resultc)[3],coef(resultc)[1],coef(resultc)[2],coef(resultc)[4],coef(resultc)[5])))
 oa = ifelse (is.finite(resulta$objective),resulta$objective,Inf)
 ob = ifelse (is.finite(sum(resultb$fvec^2)),sum(resultb$fvec^2),Inf)

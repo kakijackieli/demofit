@@ -54,11 +54,10 @@ if (!is.null(curve)) { curve <- tryCatch(match.arg(curve,choices=.curves),error 
 tryCatch({
 nr <- nrow(M); nc <- ncol(M)
 PCA <- prcomp(log(M),center=TRUE,scale=FALSE)
-a <- numeric(); for (j in 1:nc) { a[j] <- mean(log(M[,j])) }
+a <- colMeans(log(M))
 b <- PCA$rotation[,1]/sum(PCA$rotation[,1])
 k <- PCA$x[,1]*sum(PCA$rotation[,1])
-res <- array(NA,c(nr,nc))
-for (i in 1:nr) { for (j in 1:nc) { res[i,j] <- log(M[i,j])-a[j]-b[j]*k[i] }}
+res <- log(M)-matrix(a,nrow=nr,ncol=nc,byrow=TRUE)-outer(k,b)
 res <- res/sd(res)
 kf <- suppressMessages(forecast(auto.arima(tsclean(k)),h=h)$mean)
 Mf <- array(NA,c(h,nc)); Mfs <- array(NA,c(h,nc))

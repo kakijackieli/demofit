@@ -54,7 +54,7 @@ if (!is.null(curve)) { curve <- tryCatch(match.arg(curve,choices=.curves),error 
 tryCatch({
 nr <- nrow(M); nc <- ncol(M)
 PCA <- prcomp(log(M),center=TRUE,scale=FALSE)
-a <- numeric(); for (j in 1:nc) { a[j] <- mean(log(M[,j])) }
+a <- colMeans(log(M))
 b <- PCA$rotation[,1]/sum(PCA$rotation[,1])
 k <- PCA$x[,1]*sum(PCA$rotation[,1])
 g <- rep(0,nr+nc-1)

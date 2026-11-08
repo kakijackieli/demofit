@@ -66,8 +66,8 @@ if (!is.null(curve)) { curve <- tryCatch(match.arg(curve,choices=.curves),error 
 tryCatch({
 nr <- nrow(M1); nc <- ncol(M1)
 PCA <- prcomp(log((M1+M2)/2),center=TRUE,scale=FALSE)
-a1 <- numeric(); for (j in 1:nc) { a1[j] <- mean(log(M1[,j])) }
-a2 <- numeric(); for (j in 1:nc) { a2[j] <- mean(log(M2[,j])) }
+a1 <- colMeans(log(M1))
+a2 <- colMeans(log(M2))
 B <- PCA$rotation[,1]/sum(PCA$rotation[,1])
 K <- PCA$x[,1]*sum(PCA$rotation[,1])
 PCA1 <- prcomp(log(M1)-matrix(B,nr,nc,byrow=TRUE)*matrix(K,nr,nc,byrow=FALSE),center=TRUE,scale=FALSE)

@@ -17,7 +17,7 @@ f <- function(p) { sum(w *(log(m)-log(p[1]^((x+p[2])^p[3])+p[4]/exp(p[5]*(log(xx
 suppressWarnings(resulta <- nlminb(c(result1$par,result2$par,result3$par),f,lower=rep(0,8),upper=rep(Inf,8)))
 h <- function(p) { sqrt(w)*(log(m)-log(p[1]^((x+p[2])^p[3])+p[4]/exp(p[5]*(log(xx)-log(p[6]))^2)+p[7]*p[8]^x/(1+p[7]*p[8]^x))) }
 suppressWarnings(resultb <- nls.lm(c(result1$par,result2$par,result3$par),h,lower=rep(0,8),upper=rep(Inf,8)))
-resultc <- MortalityLaw(x=x,mx=m,law="HP2")
+suppressWarnings(resultc <- MortalityLaw(x=x,mx=m,law="HP2"))
 error <- f(as.numeric(coef(resultc)))
 oa = ifelse (is.finite(resulta$objective),resulta$objective,Inf)
 ob = ifelse (is.finite(sum(resultb$fvec^2)),sum(resultb$fvec^2),Inf)

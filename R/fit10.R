@@ -18,7 +18,7 @@ suppressWarnings(resulta <- nlminb(c(result1$par,result2$par,result3$par),f))
 suppressWarnings(resultb <- optim(c(result1$par,result2$par,result3$par),f,method="Nelder-Mead"))
 h <- function(p) { sqrt(w)*(log(m)-log(p[1]^((x+p[2])^p[3])+p[4]/exp(p[5]*(log(xx)-log(p[6]))^2)+p[7]*p[8]^x/(1+p[7]*p[8]^x))) }
 suppressWarnings(resultc <- nls.lm(c(result1$par,result2$par,result3$par),h,lower=rep(-Inf,8),upper=rep(Inf,8)))
-resultd <- MortalityLaw(x=x,mx=m,law="HP2")
+suppressWarnings(resultd <- MortalityLaw(x=x,mx=m,law="HP2"))
 error <- f(as.numeric(coef(resultd)))
 oa = ifelse (is.finite(resulta$objective),resulta$objective,Inf)
 ob = ifelse (is.finite(resultb$value),resultb$value,Inf)

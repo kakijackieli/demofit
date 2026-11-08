@@ -49,8 +49,7 @@ tryCatch({
 nr <- nrow(M); nc <- ncol(M)
 k1 <- numeric(); k2 <- numeric()
 xx <- x-mean(x); for (i in 1:nr) { yy <- log(M[i,]); k1[i] <- as.numeric(lm(yy~xx)$coef[1]); k2[i] <- as.numeric(lm(yy~xx)$coef[2]) }
-res <- array(NA,c(nr,nc))
-for (i in 1:nr) { for (j in 1:nc) { res[i,j] <- log(M[i,j])-k1[i]-k2[i]*(x[j]-mean(x)) }}
+res <- log(M)-matrix(k1,nrow=nr,ncol=nc,byrow=FALSE)-outer(k2,(x-mean(x)))
 res <- res/sd(res)
 k1f <- suppressMessages(forecast(auto.arima(tsclean(k1)),h=h)$mean)
 k2f <- suppressMessages(forecast(auto.arima(tsclean(k2)),h=h)$mean)

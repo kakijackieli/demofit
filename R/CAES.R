@@ -59,8 +59,8 @@ CAES <- function(x,M1,M2,curve=NULL,h=10,jumpoff=1) {
 if (!is.null(curve)) { curve <- tryCatch(match.arg(curve,choices=.curves),error = function(e) { stop("invalid curve choice") }) }
 tryCatch({
 nr <- nrow(M1); nc <- ncol(M1)
-a1 <- numeric(); for (j in 1:nc) { a1[j] <- mean(log(M1[,j])) }
-a2 <- numeric(); for (j in 1:nc) { a2[j] <- mean(log(M2[,j])) }
+a1 <- colMeans(log(M1))
+a2 <- colMeans(log(M2))
 PCA1 <- prcomp(log(M1),center=TRUE,scale=FALSE)
 b1 <- PCA1$rotation[,1]/sum(PCA1$rotation[,1])
 k1 <- PCA1$x[,1]*sum(PCA1$rotation[,1])
