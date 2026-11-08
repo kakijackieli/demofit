@@ -12,6 +12,8 @@ vignette: >
 
 ```{r, message=FALSE}
 library(demofit)
+library(forecast)
+library(ggplot2)
 ```
 
 ## 1. Introduction
@@ -117,8 +119,8 @@ k1 <- -2.97-0.0245*(0:29)
 k2 <- 0.101+0.000345*(0:29)
 set.seed(123)
 M <- exp(matrix(k1,nrow=30,ncol=30,byrow=FALSE)+outer(k2,(x-mean(x)))+rnorm(900,0,0.035))
-# fit CBD model to mortality rates and smooth forecasted rates by Makeham curve
-fit <- CBDS(x=x,M=M,curve="makeham",h=30,jumpoff=2)
+# fit CBD model to mortality rates
+fit <- CBDS(x=x,M=M,h=30,jumpoff=2)
 # print estimated parameters
 coef(fit)
 # plot fitting and forecasting results
@@ -129,9 +131,87 @@ The two fitted models forecast mortality rates for the next 30 years, anchored t
 
 The stochastic mortality models can be fitted using either the unified interface or individual model-specific functions. 
 
-## 5. Advanced features
+## 5. Prediction intervals
 
-The function `ENI()` generates ensemble interval forecast of mortality rates.
+Under the Gaussian assumption, the code below produces the 95% prediction intervals under the Lee-Carter model. 
+
+```{r}
+# generate synthetic mortality rates in matrix form
+x <- 60:89
+a <- c(-4.8499,-4.7676,-4.6719,-4.5722,-4.4847,-4.3841,-4.2813,-4.1863,-4.0861,-3.9962,
+-3.8885,-3.7896,-3.6853,-3.5737,-3.4728,-3.3718,-3.2586,-3.1474,-3.0371,-2.9206,
+-2.7998,-2.6845,-2.5653,-2.4581,-2.3367,-2.2159,-2.1017,-1.9941,-1.8821, -1.7697)
+b <- c(0.0283,0.0321,0.0335,0.0336,0.0341,0.0358,0.0368,0.0403,0.0392,0.0395,
+0.0396,0.0399,0.0397,0.0386,0.039,0.0375,0.0367,0.0368,0.035,0.0354,
+0.0336,0.0323,0.0313,0.0295,0.0282,0.0265,0.024,0.0226,0.0219,0.0183)
+k <- c(12.11,10.69,11.18,9.64,9.35,8.21,6.89,5.74,4.56,3.6,
+3.27,2.04,1.11,-0.44,-1.05,-1.03,-1.84,-2.9,-4.03,-4.12,
+-5.18,-5.64,-6,-6.51,-6.91,-6.9,-8.32,-8.53,-9.69,-9.31)
+set.seed(123)
+M <- exp(outer(k,b)+matrix(a,nrow=30,ncol=30,byrow=TRUE)+rnorm(900,0,0.005))
+# fit Lee-Carter model to mortality rates
+fit <- LCS(x=x,M=M,h=30,jumpoff=2)
+Mf <- forecast::forecast(fit)
+Msim <- simulate(fit,nsim=100)
+u <- apply(Msim[[1]][,6,],1,quantile,probs=0.975)
+l <- apply(Msim[[1]][,6,],1,quantile,probs=0.025)
+# plot forecasting results
+plot(c(1991:2020),log(M[,6]),xlab="year",ylab="log death rate at age 65",xlim=c(1991,2050),ylim=c(-6,-3.5),type="l")
+lines(c(2021:2050),log(Mf[,6]),lty=2)
+lines(c(2021:2050),log(u),lty=3)
+lines(c(2021:2050),log(l),lty=3)
+legend("topright",legend=c("observed","forecast","interval"),lty=c(1,2,3),bty="n",cex=0.8)
+```
+
+Under the Poisson assumption, the code below produces the 95% prediction intervals under the Lee-Carter model via residuals bootstrapping. 
+
+```{r}
+# generate synthetic mortality data in matrix form
+x <- 60:89
+a <- c(-4.8499,-4.7676,-4.6719,-4.5722,-4.4847,-4.3841,-4.2813,-4.1863,-4.0861,-3.9962,
+-3.8885,-3.7896,-3.6853,-3.5737,-3.4728,-3.3718,-3.2586,-3.1474,-3.0371,-2.9206,
+-2.7998,-2.6845,-2.5653,-2.4581,-2.3367,-2.2159,-2.1017,-1.9941,-1.8821, -1.7697)
+b <- c(0.0283,0.0321,0.0335,0.0336,0.0341,0.0358,0.0368,0.0403,0.0392,0.0395,
+0.0396,0.0399,0.0397,0.0386,0.039,0.0375,0.0367,0.0368,0.035,0.0354,
+0.0336,0.0323,0.0313,0.0295,0.0282,0.0265,0.024,0.0226,0.0219,0.0183)
+k <- c(12.11,10.69,11.18,9.64,9.35,8.21,6.89,5.74,4.56,3.6,
+3.27,2.04,1.11,-0.44,-1.05,-1.03,-1.84,-2.9,-4.03,-4.12,
+-5.18,-5.64,-6,-6.51,-6.91,-6.9,-8.32,-8.53,-9.69,-9.31)
+set.seed(123)
+M <- exp(outer(k,b)+matrix(a,nrow=30,ncol=30,byrow=TRUE)+rnorm(900,0,0.005))
+E <- matrix(c(107788,108036,107481,106552,104608,100104,95803,91345,84980,79557,
+75146,70559,65972,60898,55623,50522,47430,45895,41443,34774,
+30531,27754,25105,22271,19437,16888,14458,12146,10038,7994),30,30,byrow=TRUE)
+D <- round(E*M)
+# fit Poisson Lee-Carter model to mortality data
+fit <- PLCS(x=x,D=D,E=E,h=30,jumpoff=2)
+a <- fit$alpha; b <- fit$beta; k <- fit$kappa
+fv <- E*exp(matrix(a,nrow=30,ncol=30,byrow=TRUE)+outer(k,b))
+res <- (D-fv)/sqrt(fv)
+Mf <- forecast::forecast(fit)
+# perform residuals bootstrapping using Pearson residuals
+Msim <- array(NA,c(30,30,100))
+for (z in 1:100) {
+temp <- matrix(sample(res,900,replace=TRUE),nrow=30,ncol=30,byrow=TRUE)
+pseudo <- pmax(round(temp*sqrt(fv)+fv,0),0)
+model <- PLCS(x=x,D=pseudo,E=E,h=30,jumpoff=2)
+bb <- model$beta; kk <- model$kappa
+kkf <- simulate(auto.arima(tsclean(kk)),nsim=30)
+Msim[,,z] <- exp(matrix(log(D[30,]/E[30,]),30,30,byrow=TRUE)+matrix(bb,30,30,byrow=TRUE)*(matrix(kkf,30,30,byrow=FALSE)-matrix(kk[30],30,30,byrow=FALSE)))
+}
+u <- apply(Msim[,6,],1,quantile,probs=0.975)
+l <- apply(Msim[,6,],1,quantile,probs=0.025)
+# plot forecasting results
+plot(c(1991:2020),log(D[,6]/E[,6]),xlab="year",ylab="log death rate at age 65",xlim=c(1991,2050),ylim=c(-6,-3.5),type="l")
+lines(c(2021:2050),log(Mf[,6]),lty=2)
+lines(c(2021:2050),log(u),lty=3)
+lines(c(2021:2050),log(l),lty=3)
+legend("topright",legend=c("observed","forecast","interval"),lty=c(1,2,3),bty="n",cex=0.8)
+```
+
+## 6. Advanced features
+
+The functions `ENS()` and `ENI()` generate ensemble forecast and ensemble interval forecast of mortality rates.
 
 ```{r}
 # generate synthetic mortality rates in matrix form
@@ -144,14 +224,22 @@ k <- c(12.11,10.69,11.18,9.64,9.35,8.21,6.89,5.74,4.56,3.60,
 set.seed(123)
 M <- exp(outer(k,b)+matrix(a,nrow=30,ncol=10,byrow=TRUE)+rnorm(300,0,0.035))
 # fit Lee-Carter, Renshaw-Haberman, age-period-cohort, and CBD models to mortality rates
-fit1 <- LCS(x=x,M=M,curve="makeham",h=30,jumpoff=2)
-fit2 <- RHS(x=x,M=M,curve="makeham",h=30,jumpoff=2)
-fit3 <- APCS(x=x,M=M,curve="makeham",h=30,jumpoff=2)
-fit4 <- CBDS(x=x,M=M,curve="makeham",h=30,jumpoff=2)
-# generate ensemble interval forecast of mortality rates
-fit <- ENI(fit1,fit2,fit3,fit4)
+fit1 <- LCS(x=x,M=M,h=30,jumpoff=2)
+fit2 <- RHS(x=x,M=M,h=30,jumpoff=2)
+fit3 <- APCS(x=x,M=M,h=30,jumpoff=2)
+fit4 <- CBDS(x=x,M=M,h=30,jumpoff=2)
+# generate ensemble forecast and ensemble interval forecast of mortality rates
+fita <- ENS(x=x,M=M,wm=c(0.25,0.25,0.25,0.25,0,0,0),h=30,jumpoff=2)
+fitb <- ENI(fit1,fit2,fit3,fit4,nsim=100)
+Mf <- forecast::forecast(fita)
+u <- forecast::forecast(fitb)[[1]]
+l <- forecast::forecast(fitb)[[2]]
 # plot ensemble results
-plot(fit)
+plot(c(1991:2020),log(M[,6]),xlab="year",ylab="log death rate at age 65",xlim=c(1991,2050),ylim=c(-8.5,-3),type="l")
+lines(c(2021:2050),log(Mf[,6]),lty=2)
+lines(c(2021:2050),log(u[,6]),lty=3)
+lines(c(2021:2050),log(l[,6]),lty=3)
+legend("topright",legend=c("observed","forecast","interval"),lty=c(1,2,3),bty="n",cex=0.8)
 ```
 
 The function `CFMS()` fits and forecasts mortality rates of two populations using the common factor model.
@@ -194,4 +282,73 @@ coef(fit)
 plot(fit,which=2)
 ```
 
-The package also supports other advanced features such as mortality ensemble and modelling sparse data.
+The function `LCLS()` fits and forecasts mortality rates using the Lee-Carter model when data are sparse.
+
+```{r}
+# generate synthetic mortality rates in irregular years in matrix form
+x <- 60:89
+t <- c(1991,1996,2001,2006,2011:2020)
+a <- c(-4.8499,-4.7676,-4.6719,-4.5722,-4.4847,-4.3841,-4.2813,-4.1863,-4.0861,-3.9962,
+-3.8885,-3.7896,-3.6853,-3.5737,-3.4728,-3.3718,-3.2586,-3.1474,-3.0371,-2.9206,
+-2.7998,-2.6845,-2.5653,-2.4581,-2.3367,-2.2159,-2.1017,-1.9941,-1.8821, -1.7697)
+b <- c(0.0283,0.0321,0.0335,0.0336,0.0341,0.0358,0.0368,0.0403,0.0392,0.0395,
+0.0396,0.0399,0.0397,0.0386,0.039,0.0375,0.0367,0.0368,0.035,0.0354,
+0.0336,0.0323,0.0313,0.0295,0.0282,0.0265,0.024,0.0226,0.0219,0.0183)
+k <- c(12.11,8.21,
+3.27,-1.03,
+-5.18,-5.64,-6,-6.51,-6.91,-6.9,-8.32,-8.53,-9.69,-9.31)
+set.seed(123)
+M <- exp(outer(k,b)+matrix(a,nrow=14,ncol=30,byrow=TRUE)+rnorm(420,0,0.035))
+# fit Lee-Carter model to mortality rates and smooth forecasted rates by Makeham curve
+fit <- LCLS(x=x,t=t,M=M,curve="makeham",h=30,jumpoff=2)
+# print estimated parameters
+coef(fit)
+# plot fitting and forecasting results
+plot(fit)
+```
+
+The function `SEN()` calculates the sensitivities of Lee-Carter model parameters, mortality forecasts, and derived actuarial quantities to small changes in data under the Lee-Carter model with the random walk with drift.
+
+```{r}
+# generate synthetic mortality rates in matrix form
+x <- 0:89
+a <- c(-5.139,-7.761,-8.307,-8.5876,-8.8136,-8.937,-8.9775,-9.0849,-9.1015,-9.1057,
+-9.0869,-9.0408,-8.9205,-8.8093,-8.6372,-8.4464,-8.1943,-7.8673,-7.6871,-7.667,
+-7.6295,-7.6334,-7.6328,-7.6202,-7.6177,-7.5742,-7.5352,-7.5152,-7.4636,-7.4287,
+-7.3658,-7.3093,-7.2398,-7.1854,-7.1199,-7.0471,-6.9808,-6.8983,-6.8253,-6.734,
+-6.6442,-6.5575,-6.4702,-6.3755,-6.2829,-6.1802,-6.0935,-5.9954,-5.9071,-5.8079,
+-5.7031,-5.6162,-5.5184,-5.4205,-5.3268,-5.2255,-5.1261,-5.0272,-4.9337,-4.8301,
+-4.725,-4.6268,-4.532,-4.4389,-4.3405,-4.2471,-4.1534,-4.0557,-3.9606,-3.8642,
+-3.7653,-3.6699,-3.5641,-3.4653,-3.3638,-3.266,-3.1626,-3.0669,-2.9646,-2.8599,
+-2.7458,-2.645,-2.5381,-2.4327,-2.3264,-2.2225,-2.1165,-2.0167,-1.9155,-1.8098)
+b <- c(0.0159,0.0183,0.0202,0.0195,0.0198,0.0182,0.0183,0.0188,0.0186,0.0176,
+0.0176,0.0182,0.0161,0.0162,0.0171,0.0162,0.0162,0.0179,0.0141,0.0131,
+0.0119,0.0108,0.0105,0.009,0.0083,0.0067,0.0068,0.0064,0.006,0.0055,
+0.0046,0.0051,0.0045,0.0041,0.0036,0.0038,0.0038,0.0032,0.0037,0.0043,
+0.0044,0.0048,0.0054,0.0055,0.0059,0.0066,0.0074,0.0079,0.0084,0.0089,
+0.0094,0.0096,0.0103,0.011,0.0114,0.0118,0.012,0.0126,0.0128,0.0132,
+0.0134,0.0139,0.0136,0.0138,0.0142,0.0145,0.0142,0.0145,0.0144,0.0143,
+0.0143,0.0141,0.0138,0.0137,0.0133,0.0129,0.0124,0.0121,0.0115,0.0111,
+0.0107,0.0101,0.0096,0.0089,0.0083,0.0077,0.0072,0.0065,0.0058,0.0054) 
+k <- c(32.88,30.83,29.74,27.03,27.41,24.96,23.05,23.14,21.99,20.18,
+19.25,14.28,14.37,10.41,10.74,8.36,8.02,5.59,4.32,0.63,
+-0.67,-2.29,-3.42,-8.27,-10.44,-8.83,-10.51,-12.5,-16.28,-19.16,
+-23.76,-24.83,-25.43,-25.53,-25.29,-27.33,-28.39,-26.77,-29.7,-27.77)
+set.seed(123)
+M <- exp(outer(k,b)+matrix(a,nrow=40,ncol=90,byrow=TRUE)+rnorm(3600,0,0.03))
+# calculate kappa sensitivities to 1% change in data
+senk <- matrix(NA,nrow=40,ncol=40)
+for (i in 1:40) { for (j in 1:40) { senk[i,j] <- SEN(M,x=46,t=j,t1=i,f="k")$sensitivity*0.01*M[j,46] }}
+# plot kappa sensitivities
+d0 <- expand.grid(OutputYear=1981:2020,InputYear=1981:2020)
+d0$Sensitivity <- as.vector(senk)
+d <- d0
+lim <- quantile(abs(d0$Sensitivity),0.95)
+ggplot(d,aes(InputYear,OutputYear,fill=Sensitivity)) +
+geom_tile() +
+scale_fill_gradient2(low="#2166AC",mid="white",high="#B2182B",midpoint=0,limits=c(-lim,lim),oob=scales::squish) +
+coord_equal() +
+labs(title="Sensitivity of kappa(t') to m(45,t)",x="Historical year",y="Output year",fill="Sensitivity") +
+theme_minimal(base_size=13) +
+theme(panel.grid=element_blank(),plot.title=element_text(size=13,face="plain"))
+```
